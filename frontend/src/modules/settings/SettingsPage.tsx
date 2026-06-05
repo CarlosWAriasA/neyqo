@@ -17,7 +17,6 @@ import { toast } from 'sonner';
 import { logout, restoreStoredUser } from '../../api/auth';
 import { getUserPreferences, updateUserPreferences } from '../../api/preferences';
 import { PageHeader } from '../../components/common/PageHeader';
-import { Skeleton } from '../../components/common/Skeleton';
 import { ErrorState } from '../../components/feedback/ErrorState';
 import { Field } from '../../components/forms/Field';
 import { Badge } from '../../components/ui/badge';
@@ -109,14 +108,15 @@ export function SettingsPage() {
         title="Configuración"
         description="Ajusta cómo Neyqo presenta tu información y administra la sesión activa."
         actions={
-          <Button onClick={handleSave} disabled={!hasChanges || savePreferencesMutation.isPending}>
-            <Save className="h-4 w-4" aria-hidden="true" />
-            {savePreferencesMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
-          </Button>
+          <>
+            {preferencesQuery.isLoading ? <Badge tone="neutral">Cargando preferencias</Badge> : null}
+            <Button onClick={handleSave} disabled={!hasChanges || savePreferencesMutation.isPending}>
+              <Save className="h-4 w-4" aria-hidden="true" />
+              {savePreferencesMutation.isPending ? 'Guardando...' : 'Guardar cambios'}
+            </Button>
+          </>
         }
       />
-
-      {preferencesQuery.isLoading ? <Skeleton className="h-20" /> : null}
 
       {preferencesQuery.isError ? (
         <ErrorState

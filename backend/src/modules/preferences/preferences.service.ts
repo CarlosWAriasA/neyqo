@@ -23,6 +23,10 @@ export class PreferencesService {
     return this.toResponse(preferences);
   }
 
+  async createInitialPreferences(userId: string): Promise<void> {
+    await this.findOrCreate(userId);
+  }
+
   async update(
     userId: string,
     payload: UpdateUserPreferencesInput,

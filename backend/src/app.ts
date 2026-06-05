@@ -38,6 +38,8 @@ export async function buildApp() {
   const accountsService = new AccountsService(appDataSource.getRepository(Account));
   const categoriesService = new CategoriesService(appDataSource.getRepository(Category));
   const budgetsService = new BudgetsService(appDataSource);
+  const preferencesService = new PreferencesService(appDataSource.getRepository(UserPreference));
+  const scheduledTransactionsService = new ScheduledTransactionsService(appDataSource);
   const authService = new AuthService(
     appDataSource.getRepository(User),
     authEmailService,
@@ -45,10 +47,10 @@ export async function buildApp() {
     accountsService,
     categoriesService,
     budgetsService,
+    preferencesService,
+    scheduledTransactionsService,
   );
-  const preferencesService = new PreferencesService(appDataSource.getRepository(UserPreference));
   const transactionsService = new TransactionsService(appDataSource);
-  const scheduledTransactionsService = new ScheduledTransactionsService(appDataSource);
 
   app.get('/api/health', async () => ({
     status: 'ok',

@@ -35,6 +35,9 @@ export class User {
   @Column({ name: 'avatar_url', type: 'varchar', length: 500, nullable: true })
   avatarUrl!: string | null;
 
+  @Column({ name: 'initial_data_notice_shown', type: 'boolean', default: false })
+  initialDataNoticeShown!: boolean;
+
   @Column({
     name: 'email_verification_code_hash',
     type: 'varchar',

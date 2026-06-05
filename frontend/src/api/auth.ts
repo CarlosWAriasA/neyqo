@@ -60,6 +60,12 @@ export async function getCurrentUser() {
   return data.user;
 }
 
+export async function initializeUserData() {
+  const { data } = await apiClient.post<{ user: AuthUser }>('/auth/initialize-data');
+  authStorage.setUser(data.user);
+  return data.user;
+}
+
 export async function logout() {
   try {
     await apiClient.post('/auth/logout');

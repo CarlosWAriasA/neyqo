@@ -10,7 +10,7 @@ import {
   resetPasswordSchema,
   verifyEmailSchema,
 } from './auth.schemas';
-import type { AuthService, AuthSessionResponse } from './auth.service';
+import { AuthError, type AuthService, type AuthSessionResponse } from './auth.service';
 
 function validationError(message: string, fieldErrors?: Record<string, string[] | undefined>) {
   return {
@@ -173,7 +173,7 @@ export const buildAuthRoutes =
     });
 
     app.get('/oauth/google/start', async (request, reply) => {
-      if (!env.googleClientId) {
+      if (!env.googleClientId || !env.googleClientSecret || !env.googleAuthRedirectUri) {
         return reply.code(501).send({ message: 'Google OAuth no está configurado.' });
       }
 
@@ -207,9 +207,12 @@ export const buildAuthRoutes =
         );
       } catch (error) {
         request.log.warn({ error }, 'Google OAuth callback failed.');
+        const callbackError = error instanceof AuthError && error.statusCode === 409
+          ? 'account_exists'
+          : 'auth_failed';
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
-            error: 'auth_failed',
+            error: callbackError,
             provider: 'google',
           }),
         );
@@ -217,7 +220,7 @@ export const buildAuthRoutes =
     });
 
     app.get('/oauth/microsoft/start', async (request, reply) => {
-      if (!env.microsoftClientId) {
+      if (!env.microsoftClientId || !env.microsoftClientSecret || !env.microsoftAuthRedirectUri) {
         return reply.code(501).send({ message: 'Microsoft OAuth no está configurado.' });
       }
 
@@ -252,9 +255,12 @@ export const buildAuthRoutes =
         );
       } catch (error) {
         request.log.warn({ error }, 'Microsoft OAuth callback failed.');
+        const callbackError = error instanceof AuthError && error.statusCode === 409
+          ? 'account_exists'
+          : 'auth_failed';
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
-            error: 'auth_failed',
+            error: callbackError,
             provider: 'microsoft',
           }),
         );
@@ -311,6 +317,16 @@ export const buildAuthRoutes =
         : undefined;
 
       const user = await authService.getCurrentUser(accessToken);
+      return reply.code(200).send({ user });
+    });
+
+    app.post('/initialize-data', async (request, reply) => {
+      const authorizationHeader = request.headers.authorization;
+      const accessToken = authorizationHeader?.startsWith('Bearer ')
+        ? authorizationHeader.slice(7)
+        : undefined;
+
+      const user = await authService.initializeUserData(accessToken);
       return reply.code(200).send({ user });
     });
   };

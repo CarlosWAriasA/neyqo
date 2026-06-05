@@ -20,6 +20,26 @@ interface OAuthMessage {
   error?: string;
 }
 
+function getOAuthErrorMessage(error: string) {
+  if (error === 'account_exists') {
+    return 'Ya existe una cuenta con ese correo. Inicia sesión con tu contraseña.';
+  }
+
+  return 'No pudimos completar la autenticación con el proveedor.';
+}
+
+function createOAuthChannel() {
+  if (typeof BroadcastChannel === 'undefined') {
+    return null;
+  }
+
+  try {
+    return new BroadcastChannel('neyqo-oauth');
+  } catch {
+    return null;
+  }
+}
+
 function decodeOAuthSession(rawSession: string): OAuthSessionPayload | null {
   try {
     const base64 = rawSession.replace(/-/g, '+').replace(/_/g, '/');
@@ -52,26 +72,45 @@ export function OAuthCallbackPage() {
     const error = searchParams.get('error');
     const provider = searchParams.get('provider') as 'google' | 'microsoft' | null;
     const targetOrigin = window.location.origin;
-    const channel = typeof BroadcastChannel !== 'undefined'
-      ? new BroadcastChannel('neyqo-oauth')
-      : null;
+    const channel = createOAuthChannel();
 
     const notifyParent = (message: OAuthMessage) => {
-      localStorage.setItem(oauthResultStorageKey, JSON.stringify(message));
-      window.opener?.postMessage(message, targetOrigin);
-      channel?.postMessage(message);
+      try {
+        localStorage.setItem(oauthResultStorageKey, JSON.stringify(message));
+      } catch {
+        // Best effort only; navigation must continue even when browser storage is blocked.
+      }
+
+      try {
+        window.opener?.postMessage(message, targetOrigin);
+      } catch {
+        // Best effort only.
+      }
+
+      try {
+        channel?.postMessage(message);
+      } catch {
+        // Best effort only.
+      }
     };
 
     const finishOAuthFlow = (fallbackPath: string) => {
-      channel?.close();
+      try {
+        channel?.close();
+      } catch {
+        // Best effort only.
+      }
 
       if (window.opener) {
-        window.close();
-        window.setTimeout(() => {
-          if (!window.closed) {
-            window.location.replace(fallbackPath);
-          }
-        }, 500);
+        try {
+          window.close();
+        } finally {
+          window.setTimeout(() => {
+            if (!window.closed) {
+              window.location.replace(fallbackPath);
+            }
+          }, 500);
+        }
         return;
       }
 
@@ -93,7 +132,7 @@ export function OAuthCallbackPage() {
 
     if (error) {
       notifyParent(
-        { type: 'oauth_error', provider, error: 'No pudimos completar la autenticación con el proveedor.' },
+        { type: 'oauth_error', provider, error: getOAuthErrorMessage(error) },
       );
       window.setTimeout(() => finishOAuthFlow('/?auth=login'), 250);
       return;

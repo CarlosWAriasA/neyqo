@@ -7,6 +7,7 @@ export interface AuthUser {
   hasPasswordAccess: boolean;
   hasGoogleAccess: boolean;
   avatarUrl?: string;
+  initialDataNoticeShown: boolean;
   createdAt: string;
 }
 

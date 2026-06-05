@@ -14,6 +14,7 @@ import { User } from '../entities/user.entity';
 import { WorkerJobError } from '../entities/worker-job-error.entity';
 import { WorkerJobRun } from '../entities/worker-job-run.entity';
 import { AddWorkerAutomation1780000000000 } from './migrations/1780000000000-AddWorkerAutomation';
+import { AddInitialDataNoticeShownToUsers1780000000001 } from './migrations/1780000000001-AddInitialDataNoticeShownToUsers';
 
 export const appDataSource = new DataSource({
   type: 'postgres',
@@ -35,5 +36,5 @@ export const appDataSource = new DataSource({
     WorkerJobError,
     EmailSyncedMessage,
   ],
-  migrations: [AddWorkerAutomation1780000000000],
+  migrations: [AddWorkerAutomation1780000000000, AddInitialDataNoticeShownToUsers1780000000001],
 });

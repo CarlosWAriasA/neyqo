@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { env } from '../../config/env';
 import { cn } from '../../utils/cn';
 
@@ -30,15 +31,62 @@ interface SocialAuthButtonsProps {
 type OAuthProvider = 'google' | 'microsoft';
 const oauthResultStorageKey = 'neyqo.oauth-result';
 
-export function SocialAuthButtons({ googleLabel, microsoftLabel, loading }: SocialAuthButtonsProps) {
+interface OAuthResult {
+  type?: 'oauth_success' | 'oauth_error';
+  provider?: OAuthProvider | null;
+  error?: string;
+}
+
+export function SocialAuthButtons({
+  googleLabel,
+  microsoftLabel,
+  onSuccess,
+  onError,
+  loading,
+}: SocialAuthButtonsProps) {
   const apiBase = env.apiBaseUrl.startsWith('http')
     ? env.apiBaseUrl
     : `${window.location.protocol}//${window.location.hostname}:3000/api`;
 
+  useEffect(() => {
+    let rawResult: string | null = null;
+
+    try {
+      rawResult = localStorage.getItem(oauthResultStorageKey);
+      localStorage.removeItem(oauthResultStorageKey);
+    } catch {
+      return;
+    }
+
+    if (!rawResult) {
+      return;
+    }
+
+    try {
+      const result = JSON.parse(rawResult) as OAuthResult;
+
+      if (result.type === 'oauth_error' && result.error) {
+        onError?.(result.error);
+      }
+
+      if (result.type === 'oauth_success' && result.provider) {
+        onSuccess?.(result.provider);
+      }
+    } catch {
+      onError?.('No pudimos completar la autenticación con el proveedor.');
+    }
+  }, [onError, onSuccess]);
+
   const startOAuthRedirect = (provider: OAuthProvider) => {
     const url = new URL(`${apiBase}/auth/oauth/${provider}/start`);
     url.searchParams.set('returnTo', window.location.origin);
-    localStorage.removeItem(oauthResultStorageKey);
+
+    try {
+      localStorage.removeItem(oauthResultStorageKey);
+    } catch {
+      // Best effort only.
+    }
+
     window.location.assign(url.toString());
   };
 

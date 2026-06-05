@@ -11,6 +11,8 @@ import { User } from '../../entities/user.entity';
 import type { AccountsService } from '../accounts/accounts.service';
 import type { BudgetsService } from '../budgets/budgets.service';
 import type { CategoriesService } from '../categories/categories.service';
+import type { PreferencesService } from '../preferences/preferences.service';
+import type { ScheduledTransactionsService } from '../scheduled-transactions/scheduled-transactions.service';
 import { AuthEmailDeliveryError, AuthEmailService } from './auth-email.service';
 import type {
   ForgotPasswordInput,
@@ -56,6 +58,7 @@ export interface PublicUser {
   hasPasswordAccess: boolean;
   hasGoogleAccess: boolean;
   avatarUrl?: string;
+  initialDataNoticeShown: boolean;
   createdAt: string;
 }
 
@@ -85,6 +88,8 @@ const invalidVerificationEmailMessage =
   'No pudimos confirmar ese correo. Revisa la dirección e inténtalo nuevamente.';
 const verificationEmailSendFailedMessage =
   'No pudimos enviar el código de verificación. Intenta nuevamente.';
+const socialAccountEmailConflictMessage =
+  'Ya existe una cuenta con ese correo. Inicia sesión con tu contraseña.';
 
 export class AuthService {
   constructor(
@@ -94,6 +99,8 @@ export class AuthService {
     private readonly accountsService: AccountsService,
     private readonly categoriesService: CategoriesService,
     private readonly budgetsService: BudgetsService,
+    private readonly preferencesService: PreferencesService,
+    private readonly scheduledTransactionsService: ScheduledTransactionsService,
   ) {}
 
   async register(payload: RegisterInput): Promise<AuthActionResponse> {
@@ -111,6 +118,7 @@ export class AuthService {
       passwordHash,
       emailVerified: false,
       avatarUrl: null,
+      initialDataNoticeShown: false,
       emailVerificationCodeHash: null,
       emailVerificationCodeExpiresAt: null,
       passwordResetCodeHash: null,
@@ -121,7 +129,6 @@ export class AuthService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.createInitialFinancialRecords(savedUser.id);
     await this.ensureIdentity({
       userId: savedUser.id,
       provider: 'email',
@@ -283,32 +290,7 @@ export class AuthService {
     const existingByEmail = await this.findByEmail(googleProfile.email);
 
     if (existingByEmail) {
-      await this.usersRepository.update(
-        {
-          id: existingByEmail.id,
-        },
-        {
-          emailVerified: true,
-          emailVerificationCodeHash: null,
-          emailVerificationCodeExpiresAt: null,
-          avatarUrl: existingByEmail.avatarUrl ?? googleProfile.avatarUrl ?? null,
-        },
-      );
-
-      await this.ensureIdentity({
-        userId: existingByEmail.id,
-        provider: 'google',
-        providerUserId: googleProfile.sub,
-        providerEmail: googleProfile.email,
-      });
-
-      const savedUser = await this.findById(existingByEmail.id);
-
-      if (!savedUser) {
-        throw new Error('No fue posible recuperar la cuenta enlazada con Google.');
-      }
-
-      return this.createSession(savedUser, reply);
+      throw new AuthError(409, socialAccountEmailConflictMessage);
     }
 
     const user = this.usersRepository.create({
@@ -316,6 +298,7 @@ export class AuthService {
       email: googleProfile.email,
       emailVerified: true,
       avatarUrl: googleProfile.avatarUrl ?? null,
+      initialDataNoticeShown: false,
       passwordHash: null,
       emailVerificationCodeHash: null,
       emailVerificationCodeExpiresAt: null,
@@ -327,7 +310,6 @@ export class AuthService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.createInitialFinancialRecords(savedUser.id);
 
     await this.ensureIdentity({
       userId: savedUser.id,
@@ -447,6 +429,40 @@ export class AuthService {
     return this.toPublicUser(user);
   }
 
+  async initializeUserData(accessToken: string | undefined): Promise<PublicUser> {
+    if (!accessToken) {
+      throw new AuthError(401, 'Falta el access token.');
+    }
+
+    const payload = this.verifyAccessToken(accessToken);
+    const user = await this.findById(payload.sub);
+
+    if (!user) {
+      throw new AuthError(401, 'El usuario de la sesión no existe.');
+    }
+
+    await this.createInitialFinancialRecords(user.id);
+
+    if (!user.initialDataNoticeShown) {
+      await this.usersRepository.update(
+        {
+          id: user.id,
+        },
+        {
+          initialDataNoticeShown: true,
+        },
+      );
+    }
+
+    const persistedUser = await this.findById(user.id);
+
+    if (!persistedUser) {
+      throw new Error('No fue posible recuperar el usuario tras inicializar sus datos.');
+    }
+
+    return this.toPublicUser(persistedUser);
+  }
+
   async logout(refreshToken: string | undefined, reply: FastifyReply): Promise<void> {
     if (refreshToken) {
       try {
@@ -541,6 +557,8 @@ export class AuthService {
     await this.accountsService.createInitialAccounts(userId);
     await this.categoriesService.createInitialCategories(userId);
     await this.budgetsService.createInitialBudgets(userId);
+    await this.scheduledTransactionsService.createInitialScheduledTransactions(userId);
+    await this.preferencesService.createInitialPreferences(userId);
   }
 
   private verifyAccessToken(token: string): AccessTokenPayload {
@@ -769,6 +787,7 @@ export class AuthService {
       hasPasswordAccess: this.userCanLoginWithPassword(user),
       hasGoogleAccess: providers.includes('google'),
       avatarUrl: user.avatarUrl ?? undefined,
+      initialDataNoticeShown: user.initialDataNoticeShown,
       createdAt: user.createdAt.toISOString(),
     };
   }
@@ -880,7 +899,6 @@ export class AuthService {
       response_type: 'code',
       scope: 'openid email profile',
       state,
-      access_type: 'offline',
       prompt: 'select_account',
     });
 
@@ -1035,30 +1053,7 @@ export class AuthService {
     const existingByEmail = await this.findByEmail(profile.email);
 
     if (existingByEmail) {
-      await this.usersRepository.update(
-        { id: existingByEmail.id },
-        {
-          emailVerified: true,
-          emailVerificationCodeHash: null,
-          emailVerificationCodeExpiresAt: null,
-          avatarUrl: existingByEmail.avatarUrl ?? profile.avatarUrl ?? null,
-        },
-      );
-
-      await this.ensureIdentity({
-        userId: existingByEmail.id,
-        provider: 'microsoft',
-        providerUserId: profile.sub,
-        providerEmail: profile.email,
-      });
-
-      const savedUser = await this.findById(existingByEmail.id);
-
-      if (!savedUser) {
-        throw new Error('No fue posible recuperar la cuenta enlazada con Microsoft.');
-      }
-
-      return this.createSession(savedUser, reply);
+      throw new AuthError(409, socialAccountEmailConflictMessage);
     }
 
     const user = this.usersRepository.create({
@@ -1066,6 +1061,7 @@ export class AuthService {
       email: profile.email,
       emailVerified: true,
       avatarUrl: profile.avatarUrl ?? null,
+      initialDataNoticeShown: false,
       passwordHash: null,
       emailVerificationCodeHash: null,
       emailVerificationCodeExpiresAt: null,
@@ -1077,7 +1073,6 @@ export class AuthService {
     });
 
     const savedUser = await this.usersRepository.save(user);
-    await this.createInitialFinancialRecords(savedUser.id);
 
     await this.ensureIdentity({
       userId: savedUser.id,

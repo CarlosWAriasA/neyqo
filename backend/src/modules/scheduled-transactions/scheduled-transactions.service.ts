@@ -216,6 +216,112 @@ export class ScheduledTransactionsService {
     }));
   }
 
+  async createInitialScheduledTransactions(userId: string): Promise<void> {
+    await this.dataSource.transaction(async (manager) => {
+      await manager.query('SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))', [
+        'neyqo-initial-salary-schedule',
+        userId,
+      ]);
+
+      const existingSalarySchedules = await manager.find(ScheduledTransaction, {
+        where: {
+          userId,
+          type: 'income',
+          name: 'Salario mensual',
+        },
+        order: {
+          createdAt: 'ASC',
+        },
+      });
+
+      if (existingSalarySchedules.length > 0) {
+        await this.cleanupDuplicateInitialSalarySchedules(manager, userId, existingSalarySchedules);
+        return;
+      }
+
+      const account = await manager.findOne(Account, {
+        where: {
+          userId,
+          name: 'Cuenta de Banco',
+          status: 'active',
+        },
+      });
+      const category = await manager.findOne(Category, {
+        where: {
+          userId,
+          name: 'Salario',
+          type: 'income',
+          status: 'active',
+        },
+      });
+
+      if (!account || !category) {
+        return;
+      }
+
+      const startDate = this.toDateOnly(new Date());
+      const scheduled = manager.create(ScheduledTransaction, {
+        userId,
+        type: 'income',
+        name: 'Salario mensual',
+        description: 'Ingreso recurrente de nómina.',
+        amount: this.formatMoney(50000),
+        sourceAccountId: account.id,
+        categoryId: category.id,
+        frequency: 'monthly',
+        dayOfWeek: null,
+        daysOfMonth: [30],
+        monthOfYear: null,
+        startDate,
+        endDate: null,
+        nextExecutionDate: this.resolveFirstExecutionDate({
+          frequency: 'monthly',
+          daysOfMonth: [30],
+          startDate,
+        }),
+        lastExecutionDate: null,
+        status: 'active',
+        lockedBy: null,
+        lockedUntil: null,
+        lastError: null,
+      });
+
+      await manager.save(ScheduledTransaction, scheduled);
+    });
+  }
+
+  private async cleanupDuplicateInitialSalarySchedules(
+    manager: EntityManager,
+    userId: string,
+    schedules: ScheduledTransaction[],
+  ): Promise<void> {
+    const [, ...duplicates] = schedules;
+
+    for (const duplicate of duplicates) {
+      const generatedTransactionCount = await manager.count(Transaction, {
+        where: {
+          userId,
+          scheduledTransactionId: duplicate.id,
+        },
+      });
+
+      if (generatedTransactionCount === 0) {
+        await manager.delete(ScheduledTransaction, {
+          id: duplicate.id,
+          userId,
+        });
+        continue;
+      }
+
+      if (duplicate.status !== 'inactive') {
+        duplicate.status = 'inactive';
+        duplicate.lockedBy = null;
+        duplicate.lockedUntil = null;
+        await manager.save(ScheduledTransaction, duplicate);
+      }
+    }
+  }
+
   private async setStatus(
     userId: string,
     scheduledTransactionId: string,

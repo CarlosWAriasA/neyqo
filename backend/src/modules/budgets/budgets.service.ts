@@ -245,7 +245,7 @@ export class BudgetsService {
 
         const savedBudget = await manager.save(Budget, budget);
         await this.ensurePeriodsUpToCurrent(savedBudget, manager);
-        createdBudgets.push(await this.toResponse(await this.findOwnedBudget(userId, savedBudget.id, manager)));
+        createdBudgets.push(await this.toResponse(await this.findOwnedBudget(userId, savedBudget.id, manager), manager));
       }
     });
 
@@ -378,15 +378,18 @@ export class BudgetsService {
     return budget;
   }
 
-  private async toResponse(budget: Budget): Promise<BudgetResponse> {
+  private async toResponse(
+    budget: Budget,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<BudgetResponse> {
     if (budget.status === 'active') {
-      await this.ensurePeriodsUpToCurrent(budget);
+      await this.ensurePeriodsUpToCurrent(budget, manager);
     }
 
     const currentRange = this.resolveRangeForDate(budget.period, new Date(), this.getBudgetResetConfig(budget));
-    const periodHistory = await this.buildPeriodHistory(budget);
-    const spentAmount = await this.calculateSpentAmount(budget, currentRange);
-    const currentExpenses = await this.getExpensesForRange(budget, currentRange);
+    const periodHistory = await this.buildPeriodHistory(budget, manager);
+    const spentAmount = await this.calculateSpentAmount(budget, currentRange, manager);
+    const currentExpenses = await this.getExpensesForRange(budget, currentRange, manager);
     const maxAmount = Number(budget.maxAmount);
     const percentageUsed = maxAmount > 0 ? Math.round((spentAmount / maxAmount) * 100) : 0;
     const categoryIds = budget.categories.map((category) => category.id);
@@ -423,8 +426,11 @@ export class BudgetsService {
     };
   }
 
-  private async buildPeriodHistory(budget: Budget): Promise<PeriodSummary[]> {
-    const periods = await this.dataSource.getRepository(BudgetPeriodRecord).find({
+  private async buildPeriodHistory(
+    budget: Budget,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<PeriodSummary[]> {
+    const periods = await manager.find(BudgetPeriodRecord, {
       where: {
         budgetId: budget.id,
         userId: budget.userId,
@@ -436,11 +442,15 @@ export class BudgetsService {
 
     return Promise.all(
       periods.map(async (period) => {
-        const spentAmount = await this.calculateSpentAmount(budget, {
-          label: '',
-          startDate: period.startDate,
-          endDate: period.endDate,
-        });
+        const spentAmount = await this.calculateSpentAmount(
+          budget,
+          {
+            label: '',
+            startDate: period.startDate,
+            endDate: period.endDate,
+          },
+          manager,
+        );
         const budgetedAmount = Number(period.budgetedAmount);
         const percentageUsed = budgetedAmount > 0 ? Math.round((spentAmount / budgetedAmount) * 100) : 0;
 
@@ -512,16 +522,19 @@ export class BudgetsService {
     }
   }
 
-  private async calculateSpentAmount(budget: Budget, range: PeriodRange): Promise<number> {
+  private async calculateSpentAmount(
+    budget: Budget,
+    range: PeriodRange,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<number> {
     const categoryId = budget.categories[0]?.id;
 
     if (!categoryId) {
       return 0;
     }
 
-    const result = await this.dataSource
-      .getRepository(Transaction)
-      .createQueryBuilder('transaction')
+    const result = await manager
+      .createQueryBuilder(Transaction, 'transaction')
       .select('COALESCE(SUM(transaction.amount), 0)', 'total')
       .where('transaction.userId = :userId', { userId: budget.userId })
       .andWhere('transaction.type = :type', { type: 'expense' })
@@ -536,14 +549,18 @@ export class BudgetsService {
     return Number(result?.total ?? 0);
   }
 
-  private async getExpensesForRange(budget: Budget, range: PeriodRange): Promise<BudgetResponse['currentExpenses']> {
+  private async getExpensesForRange(
+    budget: Budget,
+    range: PeriodRange,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<BudgetResponse['currentExpenses']> {
     const categoryId = budget.categories[0]?.id;
 
     if (!categoryId) {
       return [];
     }
 
-    const transactions = await this.dataSource.getRepository(Transaction).find({
+    const transactions = await manager.find(Transaction, {
       where: {
         userId: budget.userId,
         type: 'expense',

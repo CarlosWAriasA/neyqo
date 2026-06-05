@@ -265,7 +265,7 @@ export function BudgetsPage() {
   }
 
   return (
-    <div className="grid gap-6">
+    <div className="grid gap-6 lg:flex lg:h-full lg:min-h-0 lg:flex-col">
       <PageHeader
         title="Presupuestos"
         description="Define límites recurrentes por semana o por mes agrupando una o varias categorías de gasto."
@@ -315,37 +315,41 @@ export function BudgetsPage() {
         </Field>
       </Card>
 
-      {budgetsQuery.isError ? (
-        <ErrorState
-          title="No pudimos cargar tus presupuestos"
-          description="Reintenta para volver a sincronizar esta vista."
-          onRetry={() => void budgetsQuery.refetch()}
-        />
-      ) : null}
-
-      {!budgetsQuery.isError && budgets.length === 0 ? (
-        <EmptyState
-          icon={ListChecks}
-          title="Todavía no tienes presupuestos activos."
-          description="Crea uno para definir cuánto deseas gastar en cada categoría y llevar un mejor control de tus gastos."
-          actionLabel="Crear presupuesto"
-          onAction={openCreatePanel}
-        />
-      ) : (
-        <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-          {budgets.map((budget) => (
-            <BudgetCard
-              key={budget.id}
-              budget={budget}
-              isChangingStatus={statusChangingBudgetId === budget.id}
-              onEdit={() => openEditPanel(budget)}
-              onOpenDetail={() => setDetailBudget(budget)}
-              onDeactivate={() => deactivateBudgetMutation.mutate(budget.id)}
-              onReactivate={() => reactivateBudgetMutation.mutate(budget.id)}
+      <div className="rounded-panel border border-border bg-surface/40 p-3 lg:min-h-0 lg:flex-1">
+        <div className="category-scrollbar max-h-[68vh] overflow-y-auto pr-2 lg:h-full lg:max-h-none">
+          {budgetsQuery.isError ? (
+            <ErrorState
+              title="No pudimos cargar tus presupuestos"
+              description="Reintenta para volver a sincronizar esta vista."
+              onRetry={() => void budgetsQuery.refetch()}
             />
-          ))}
-        </section>
-      )}
+          ) : null}
+
+          {!budgetsQuery.isError && budgets.length === 0 ? (
+            <EmptyState
+              icon={ListChecks}
+              title="Todavía no tienes presupuestos activos."
+              description="Crea uno para definir cuánto deseas gastar en cada categoría y llevar un mejor control de tus gastos."
+              actionLabel="Crear presupuesto"
+              onAction={openCreatePanel}
+            />
+          ) : (
+            <section className="grid gap-4 pb-2 md:grid-cols-2 xl:grid-cols-3">
+              {budgets.map((budget) => (
+                <BudgetCard
+                  key={budget.id}
+                  budget={budget}
+                  isChangingStatus={statusChangingBudgetId === budget.id}
+                  onEdit={() => openEditPanel(budget)}
+                  onOpenDetail={() => setDetailBudget(budget)}
+                  onDeactivate={() => deactivateBudgetMutation.mutate(budget.id)}
+                  onReactivate={() => reactivateBudgetMutation.mutate(budget.id)}
+                />
+              ))}
+            </section>
+          )}
+        </div>
+      </div>
 
       {panelOpen ? (
         <div
