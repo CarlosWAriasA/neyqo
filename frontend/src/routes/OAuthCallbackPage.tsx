@@ -62,14 +62,20 @@ export function OAuthCallbackPage() {
       channel?.postMessage(message);
     };
 
-    const closeOrRedirect = (fallbackPath: string) => {
+    const finishOAuthFlow = (fallbackPath: string) => {
       channel?.close();
-      window.close();
-      window.setTimeout(() => {
-        if (!window.closed) {
-          window.location.replace(fallbackPath);
-        }
-      }, 500);
+
+      if (window.opener) {
+        window.close();
+        window.setTimeout(() => {
+          if (!window.closed) {
+            window.location.replace(fallbackPath);
+          }
+        }, 500);
+        return;
+      }
+
+      window.location.replace(fallbackPath);
     };
 
     const finishSuccess = (payload: OAuthSessionPayload) => {
@@ -82,14 +88,14 @@ export function OAuthCallbackPage() {
           user: payload.user,
         },
       );
-      window.setTimeout(() => closeOrRedirect('/app/dashboard'), 250);
+      window.setTimeout(() => finishOAuthFlow('/app/dashboard'), 250);
     };
 
     if (error) {
       notifyParent(
         { type: 'oauth_error', provider, error: 'No pudimos completar la autenticación con el proveedor.' },
       );
-      window.setTimeout(() => closeOrRedirect('/?auth=login'), 250);
+      window.setTimeout(() => finishOAuthFlow('/?auth=login'), 250);
       return;
     }
 
@@ -106,7 +112,7 @@ export function OAuthCallbackPage() {
       notifyParent(
         { type: 'oauth_error', provider, error: 'No pudimos completar la autenticación con el proveedor.' },
       );
-      window.setTimeout(() => closeOrRedirect('/?auth=login'), 250);
+      window.setTimeout(() => finishOAuthFlow('/?auth=login'), 250);
       return;
     }
 
@@ -120,7 +126,7 @@ export function OAuthCallbackPage() {
         notifyParent(
           { type: 'oauth_error', provider, error: 'No pudimos verificar tu sesión.' },
         );
-        window.setTimeout(() => closeOrRedirect('/?auth=login'), 250);
+        window.setTimeout(() => finishOAuthFlow('/?auth=login'), 250);
       });
   }, []);
 

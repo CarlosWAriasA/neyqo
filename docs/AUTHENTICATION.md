@@ -30,7 +30,11 @@ The backend also sets an HTTP-only refresh cookie.
 
 ## Social Login
 
-Google and Microsoft buttons exist in the UI but remain disabled until external OAuth credentials and server-side flows are configured.
+Google and Microsoft buttons start a backend-owned OAuth flow and return to the React callback route:
+
+- Frontend start: `/api/auth/oauth/google/start?returnTo=<frontend-origin>`
+- Backend callback: `/api/auth/oauth/google/callback`
+- Frontend finish: `/auth/oauth/callback`
 
 Social login must request only identity scopes needed to identify the user.
 
@@ -44,11 +48,14 @@ Mail-reading consent belongs only in `/app/sync` or a sync-specific flow initiat
 
 Frontend:
 
+- `VITE_API_BASE_URL`
 - `VITE_GOOGLE_AUTH_ENABLED`
 - `VITE_MICROSOFT_AUTH_ENABLED`
 
 Backend:
 
+- `FRONTEND_URL`
+- `ALLOWED_ORIGINS`
 - `GOOGLE_CLIENT_ID`
 - `GOOGLE_CLIENT_SECRET`
 - `GOOGLE_AUTH_REDIRECT_URI`
@@ -57,9 +64,19 @@ Backend:
 - `MICROSOFT_TENANT_ID`
 - `MICROSOFT_AUTH_REDIRECT_URI`
 
+For Railway, configure the backend service with:
+
+- `FRONTEND_URL=https://<frontend-domain>`
+- `ALLOWED_ORIGINS=https://<frontend-domain>`
+- `GOOGLE_AUTH_REDIRECT_URI=https://<backend-domain>/api/auth/oauth/google/callback`
+
+Configure the frontend service with:
+
+- `VITE_API_BASE_URL=https://<backend-domain>/api`
+
+In Google Cloud Console, the authorized redirect URI must match `GOOGLE_AUTH_REDIRECT_URI` exactly. It should point to the backend callback, while `FRONTEND_URL` should point to the deployed frontend.
+
 ## Pending
 
-- Implement OAuth authorization URL generation.
-- Implement OAuth callback token exchange.
 - Add Microsoft identity profile handling.
 - Add React email verification screen or change backend registration policy.
