@@ -1,0 +1,28 @@
+import type { CreateCategoryInput } from './categories.schemas';
+
+export const defaultCategories: CreateCategoryInput[] = [
+  { name: 'Salario', type: 'income', icon: 'briefcase', priority: 10, description: 'Ingresos recurrentes de nómina.' },
+  { name: 'Trabajo independiente', type: 'income', icon: 'laptop', priority: 20, description: 'Pagos por servicios o proyectos.' },
+  { name: 'Ventas', type: 'income', icon: 'store', priority: 30, description: 'Ingresos por ventas personales o negocio.' },
+  { name: 'Bonos', type: 'income', icon: 'gift', priority: 40, description: 'Bonificaciones, incentivos o regalías.' },
+  { name: 'Intereses', type: 'income', icon: 'landmark', priority: 50, description: 'Rendimientos bancarios o inversiones.' },
+  { name: 'Reembolsos', type: 'income', icon: 'rotate-ccw', priority: 60, description: 'Devoluciones de compras o gastos compartidos.' },
+  { name: 'Otros ingresos', type: 'income', icon: 'circle-ellipsis', priority: 90, description: 'Ingresos que no encajan en otra categoría.' },
+  { name: 'Comida', type: 'expense', icon: 'utensils', priority: 10, description: 'Supermercado, comida y compras del hogar.' },
+  { name: 'Restaurantes', type: 'expense', icon: 'chef-hat', priority: 20, description: 'Comidas fuera, delivery y cafeterías.' },
+  { name: 'Transporte', type: 'expense', icon: 'car', priority: 30, description: 'Combustible, taxi, transporte público y parqueos.' },
+  { name: 'Vivienda', type: 'expense', icon: 'home', priority: 40, description: 'Alquiler, hipoteca y mantenimiento del hogar.' },
+  { name: 'Servicios', type: 'expense', icon: 'receipt', priority: 50, description: 'Luz, agua, internet, teléfono y otros servicios.' },
+  { name: 'Salud', type: 'expense', icon: 'heart-pulse', priority: 60, description: 'Consultas, seguros, farmacia y estudios médicos.' },
+  { name: 'Educación', type: 'expense', icon: 'graduation-cap', priority: 70, description: 'Cursos, colegio, universidad y materiales.' },
+  { name: 'Compras', type: 'expense', icon: 'shopping-bag', priority: 80, description: 'Ropa, accesorios y compras generales.' },
+  { name: 'Entretenimiento', type: 'expense', icon: 'gamepad-2', priority: 90, description: 'Cine, salidas, hobbies y ocio.' },
+  { name: 'Suscripciones', type: 'expense', icon: 'calendar-clock', priority: 100, description: 'Streaming, software y membresías recurrentes.' },
+  { name: 'Viajes', type: 'expense', icon: 'plane', priority: 110, description: 'Hoteles, vuelos, excursiones y vacaciones.' },
+  { name: 'Mascotas', type: 'expense', icon: 'paw-print', priority: 120, description: 'Veterinario, comida y cuidado de mascotas.' },
+  { name: 'Impuestos', type: 'expense', icon: 'file-text', priority: 130, description: 'Pagos fiscales y trámites.' },
+  { name: 'Ahorro', type: 'expense', icon: 'piggy-bank', priority: 140, description: 'Apartados para metas y fondos personales.' },
+  { name: 'Deudas', type: 'expense', icon: 'credit-card', priority: 150, description: 'Pagos a préstamos, tarjetas y cuotas.' },
+  { name: 'Donaciones', type: 'expense', icon: 'hand-heart', priority: 160, description: 'Aportes, ayudas y contribuciones.' },
+  { name: 'Otros gastos', type: 'expense', icon: 'circle-ellipsis', priority: 190, description: 'Gastos que no encajan en otra categoría.' },
+];

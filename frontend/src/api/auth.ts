@@ -1,0 +1,98 @@
+import { apiClient, authStorage, clearSilentRefresh, scheduleSilentRefresh } from './client';
+import type { AuthSession, AuthUser } from '../types/auth';
+
+export interface LoginPayload {
+  email: string;
+  password: string;
+}
+
+export interface RegisterPayload {
+  fullName: string;
+  email: string;
+  password: string;
+}
+
+export interface AuthActionResponse {
+  message: string;
+  email?: string;
+}
+
+function persistSession(session: AuthSession, remember = true) {
+  authStorage.setSession(session.accessToken, session.user, remember);
+  scheduleSilentRefresh(session.accessToken);
+  return session.user;
+}
+
+export async function login(payload: LoginPayload, options?: { remember?: boolean }) {
+  const { data } = await apiClient.post<AuthSession>('/auth/login', payload);
+  if (options?.remember ?? true) {
+    authStorage.setRememberedEmail(payload.email);
+  } else {
+    authStorage.clearRememberedEmail();
+  }
+  return persistSession(data, options?.remember ?? true);
+}
+
+export async function register(payload: RegisterPayload) {
+  const { data } = await apiClient.post<AuthActionResponse>('/auth/register', payload);
+  return data;
+}
+
+export async function requestPasswordReset(email: string) {
+  const { data } = await apiClient.post<AuthActionResponse>('/auth/password/forgot', { email });
+  return data;
+}
+
+export async function resetPassword(payload: { email: string; code: string; password: string }) {
+  const { data } = await apiClient.post<AuthActionResponse>('/auth/password/reset', payload);
+  return data;
+}
+
+export async function refreshSession() {
+  const { data } = await apiClient.post<AuthSession>('/auth/refresh');
+  return persistSession(data, authStorage.isRemembered());
+}
+
+export async function getCurrentUser() {
+  const { data } = await apiClient.get<{ user: AuthUser }>('/auth/me');
+  authStorage.setUser(data.user);
+  scheduleSilentRefresh(authStorage.getAccessToken());
+  return data.user;
+}
+
+export async function logout() {
+  try {
+    await apiClient.post('/auth/logout');
+  } finally {
+    clearSilentRefresh();
+    authStorage.clear();
+    localStorage.removeItem('neyqo.oauth-result');
+  }
+}
+
+export function restoreStoredUser(): AuthUser | null {
+  const rawSession = authStorage.getSession();
+
+  if (!rawSession) {
+    return null;
+  }
+
+  try {
+    return JSON.parse(rawSession) as AuthUser;
+  } catch {
+    authStorage.clear();
+    return null;
+  }
+}
+
+export async function verifyEmail(payload: { email: string; code: string }) {
+  const { data } = await apiClient.post<AuthSession>('/auth/verify-email', payload);
+  authStorage.setSession(data.accessToken, data.user);
+  scheduleSilentRefresh(data.accessToken);
+  return data.user;
+}
+
+export async function resendVerificationCode(email: string) {
+  const { data } = await apiClient.post<AuthActionResponse>('/auth/verify-email/resend', { email });
+  return data;
+}
