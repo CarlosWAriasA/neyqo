@@ -2,6 +2,8 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { AuthService } from '../auth/auth.service';
 import {
   createScheduledTransactionSchema,
+  listGeneratedTransactionsQuerySchema,
+  listScheduledTransactionsQuerySchema,
   scheduledTransactionParamsSchema,
   updateScheduledTransactionSchema,
 } from './scheduled-transactions.schemas';
@@ -27,8 +29,24 @@ export const buildScheduledTransactionsRoutes =
     });
 
     app.get('/', async (request, reply) => {
-      const scheduledTransactions = await scheduledTransactionsService.list(request.authUser!.id);
-      return reply.code(200).send({ scheduledTransactions });
+      const parsed = listScheduledTransactionsQuerySchema.safeParse(request.query);
+
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send(validationError('Filtros de programados inválidos.', parsed.error.flatten().fieldErrors));
+      }
+
+      try {
+        const scheduledTransactions = await scheduledTransactionsService.list(request.authUser!.id, parsed.data);
+        return reply.code(200).send(scheduledTransactions);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_CURSOR') {
+          return reply.code(400).send(validationError('Cursor de programados inválido.'));
+        }
+
+        throw error;
+      }
     });
 
     app.get('/upcoming', async (request, reply) => {
@@ -67,13 +85,32 @@ export const buildScheduledTransactionsRoutes =
 
     app.get('/:id/generated-transactions', async (request, reply) => {
       const params = scheduledTransactionParamsSchema.safeParse(request.params);
+      const query = listGeneratedTransactionsQuerySchema.safeParse(request.query);
 
       if (!params.success) {
         return reply.code(400).send(validationError('Identificador de programado inválido.'));
       }
 
-      const transactions = await scheduledTransactionsService.generatedTransactions(request.authUser!.id, params.data.id);
-      return reply.code(200).send({ transactions });
+      if (!query.success) {
+        return reply
+          .code(400)
+          .send(validationError('Filtros de transacciones generadas inválidos.', query.error.flatten().fieldErrors));
+      }
+
+      try {
+        const transactions = await scheduledTransactionsService.generatedTransactions(
+          request.authUser!.id,
+          params.data.id,
+          query.data,
+        );
+        return reply.code(200).send(transactions);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_CURSOR') {
+          return reply.code(400).send(validationError('Cursor de transacciones generadas inválido.'));
+        }
+
+        throw error;
+      }
     });
 
     app.put('/:id', async (request, reply) => {

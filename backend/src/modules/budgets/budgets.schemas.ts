@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { buildPaginationSchema } from '../../utils/pagination';
 
 export const budgetParamsSchema = z.object({
   id: z.uuid(),
@@ -51,5 +52,11 @@ export const updateBudgetSchema = z.object(budgetSchemaShape).partial().refine(
   'Envía al menos un campo para actualizar.',
 );
 
+export const listBudgetsQuerySchema = buildPaginationSchema(20).extend({
+  status: z.enum(['active', 'inactive', 'all']).optional(),
+  query: z.string().trim().max(140).optional(),
+});
+
 export type CreateBudgetInput = z.infer<typeof createBudgetSchema>;
 export type UpdateBudgetInput = z.infer<typeof updateBudgetSchema>;
+export type ListBudgetsQuery = z.infer<typeof listBudgetsQuerySchema>;

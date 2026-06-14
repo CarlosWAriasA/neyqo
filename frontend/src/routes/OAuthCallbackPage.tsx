@@ -3,6 +3,7 @@ import { useSearchParams } from 'react-router-dom';
 import { authStorage } from '../api/client';
 import { getCurrentUser } from '../api/auth';
 import type { AuthUser } from '../types/auth';
+import { queryClient } from '../app/providers/queryClient';
 
 interface OAuthSessionPayload {
   accessToken: string;
@@ -60,6 +61,7 @@ function decodeOAuthSession(rawSession: string): OAuthSessionPayload | null {
 }
 
 function persistOAuthSession(session: OAuthSessionPayload) {
+  queryClient.clear();
   authStorage.setSession(session.accessToken, session.user);
 }
 

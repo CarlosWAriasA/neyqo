@@ -1,6 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { AuthService } from '../auth/auth.service';
-import { budgetParamsSchema, createBudgetSchema, updateBudgetSchema } from './budgets.schemas';
+import { budgetParamsSchema, createBudgetSchema, listBudgetsQuerySchema, updateBudgetSchema } from './budgets.schemas';
 import type { BudgetsService } from './budgets.service';
 
 function validationError(message: string, fieldErrors?: Record<string, string[] | undefined>) {
@@ -23,8 +23,24 @@ export const buildBudgetsRoutes =
     });
 
     app.get('/', async (request, reply) => {
-      const budgets = await budgetsService.list(request.authUser!.id);
-      return reply.code(200).send({ budgets });
+      const parsed = listBudgetsQuerySchema.safeParse(request.query);
+
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send(validationError('Filtros de presupuestos inválidos.', parsed.error.flatten().fieldErrors));
+      }
+
+      try {
+        const budgets = await budgetsService.list(request.authUser!.id, parsed.data);
+        return reply.code(200).send(budgets);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_CURSOR') {
+          return reply.code(400).send(validationError('Cursor de presupuestos inválido.'));
+        }
+
+        throw error;
+      }
     });
 
     app.post('/recommended', async (request, reply) => {

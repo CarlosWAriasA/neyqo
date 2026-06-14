@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { buildPaginationSchema } from '../../utils/pagination';
 
 export const transactionTypeSchema = z.enum(['income', 'expense', 'transfer']);
 export const transactionStatusSchema = z.enum(['completed', 'pending', 'cancelled']);
@@ -53,6 +54,17 @@ export const updateTransactionSchema = createTransactionSchema.partial().refine(
   'Envía al menos un campo para actualizar.',
 );
 
+export const listTransactionsQuerySchema = buildPaginationSchema(30).extend({
+  type: transactionTypeSchema.or(z.literal('all')).optional(),
+  status: transactionStatusSchema.or(z.literal('all')).optional(),
+  dateFrom: z.iso.date().optional(),
+  dateTo: z.iso.date().optional(),
+  query: z.string().trim().max(140).optional(),
+  accountId: z.uuid().optional(),
+  categoryId: z.uuid().optional(),
+});
+
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;
 export type CreateInternalTransactionInput = z.infer<typeof createInternalTransactionSchema>;
 export type UpdateTransactionInput = z.infer<typeof updateTransactionSchema>;
+export type ListTransactionsQuery = z.infer<typeof listTransactionsQuerySchema>;

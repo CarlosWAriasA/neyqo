@@ -18,6 +18,7 @@ export type ScheduledTransactionStatus = 'active' | 'paused' | 'completed' | 'in
 
 @Entity({ name: 'scheduled_transactions' })
 @Index(['userId', 'status', 'nextExecutionDate'])
+@Index(['userId', 'status', 'nextExecutionDate', 'createdAt', 'id'])
 @Index(['lockedUntil'])
 export class ScheduledTransaction {
   @PrimaryGeneratedColumn('uuid')

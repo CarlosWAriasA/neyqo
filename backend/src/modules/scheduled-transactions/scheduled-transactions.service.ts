@@ -1,4 +1,5 @@
 import { DataSource, type EntityManager } from 'typeorm';
+import { Brackets } from 'typeorm';
 import { Account } from '../../entities/account.entity';
 import { Category } from '../../entities/category.entity';
 import { ScheduledTransaction } from '../../entities/scheduled-transaction.entity';
@@ -6,8 +7,12 @@ import { Transaction } from '../../entities/transaction.entity';
 import { AuthError } from '../auth/auth.service';
 import type {
   CreateScheduledTransactionInput,
+  ListGeneratedTransactionsQuery,
+  ListScheduledTransactionsQuery,
   UpdateScheduledTransactionInput,
 } from './scheduled-transactions.schemas';
+import { decodeCursor, encodeCursor, type PaginatedResponse, toPaginatedResponse } from '../../utils/pagination';
+import { z } from 'zod';
 
 interface ScheduleInput {
   frequency: ScheduledTransaction['frequency'];
@@ -59,24 +64,115 @@ export interface ScheduledSummary {
   balance: number;
 }
 
+const scheduledCursorSchema = z.object({
+  status: z.string(),
+  nextExecutionDate: z.string(),
+  createdAt: z.string(),
+  id: z.uuid(),
+});
+
+const generatedTransactionCursorSchema = z.object({
+  date: z.string(),
+  id: z.uuid(),
+});
+
 export class ScheduledTransactionsService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async list(userId: string): Promise<ScheduledTransactionResponse[]> {
-    const scheduledTransactions = await this.dataSource.getRepository(ScheduledTransaction).find({
-      where: { userId },
-      relations: {
-        sourceAccount: true,
-        category: true,
-      },
-      order: {
-        status: 'ASC',
-        nextExecutionDate: 'ASC',
-        createdAt: 'DESC',
-      },
-    });
+  async list(
+    userId: string,
+    filters: ListScheduledTransactionsQuery,
+  ): Promise<PaginatedResponse<ScheduledTransactionResponse>> {
+    const cursor = decodeCursor(filters.cursor, scheduledCursorSchema);
+    const query = this.dataSource
+      .getRepository(ScheduledTransaction)
+      .createQueryBuilder('scheduled')
+      .leftJoinAndSelect('scheduled.sourceAccount', 'sourceAccount')
+      .leftJoinAndSelect('scheduled.category', 'category')
+      .where('scheduled.userId = :userId', { userId });
 
-    return scheduledTransactions.map((scheduled) => this.toResponse(scheduled));
+    if (filters.status && filters.status !== 'all') {
+      query.andWhere('scheduled.status = :status', { status: filters.status });
+    }
+
+    if (filters.type && filters.type !== 'all') {
+      query.andWhere('scheduled.type = :type', { type: filters.type });
+    }
+
+    if (filters.query) {
+      query.andWhere(
+        new Brackets((builder) => {
+          builder
+            .where('LOWER(scheduled.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
+            .orWhere('LOWER(scheduled.description) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
+            .orWhere('LOWER(sourceAccount.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
+            .orWhere('LOWER(category.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` });
+        }),
+      );
+    }
+
+    if (cursor) {
+      query.andWhere(
+        new Brackets((builder) => {
+          builder
+            .where('scheduled.status > :cursorStatus', { cursorStatus: cursor.status })
+            .orWhere(
+              new Brackets((sameStatus) => {
+                sameStatus
+                  .where('scheduled.status = :cursorStatus', { cursorStatus: cursor.status })
+                  .andWhere('scheduled.nextExecutionDate > :cursorNextExecutionDate', {
+                    cursorNextExecutionDate: cursor.nextExecutionDate,
+                  });
+              }),
+            )
+            .orWhere(
+              new Brackets((sameStatusAndExecution) => {
+                sameStatusAndExecution
+                  .where('scheduled.status = :cursorStatus', { cursorStatus: cursor.status })
+                  .andWhere('scheduled.nextExecutionDate = :cursorNextExecutionDate', {
+                    cursorNextExecutionDate: cursor.nextExecutionDate,
+                  })
+                  .andWhere('scheduled.createdAt < :cursorCreatedAt', {
+                    cursorCreatedAt: cursor.createdAt,
+                  });
+              }),
+            )
+            .orWhere(
+              new Brackets((sameAll) => {
+                sameAll
+                  .where('scheduled.status = :cursorStatus', { cursorStatus: cursor.status })
+                  .andWhere('scheduled.nextExecutionDate = :cursorNextExecutionDate', {
+                    cursorNextExecutionDate: cursor.nextExecutionDate,
+                  })
+                  .andWhere('scheduled.createdAt = :cursorCreatedAt', {
+                    cursorCreatedAt: cursor.createdAt,
+                  })
+                  .andWhere('scheduled.id < :cursorId', { cursorId: cursor.id });
+              }),
+            );
+        }),
+      );
+    }
+
+    const scheduledTransactions = await query
+      .orderBy('scheduled.status', 'ASC')
+      .addOrderBy('scheduled.nextExecutionDate', 'ASC')
+      .addOrderBy('scheduled.createdAt', 'DESC')
+      .addOrderBy('scheduled.id', 'DESC')
+      .take(filters.limit + 1)
+      .getMany();
+
+    return toPaginatedResponse(
+      scheduledTransactions.map((scheduled) => this.toResponse(scheduled)),
+      filters.limit,
+      (scheduled) =>
+        encodeCursor({
+          status: scheduled.status,
+          nextExecutionDate: scheduled.nextExecutionDate,
+          createdAt: scheduled.createdAt,
+          id: scheduled.id,
+        }),
+    );
   }
 
   async getById(userId: string, scheduledTransactionId: string): Promise<ScheduledTransactionResponse> {
@@ -188,32 +284,61 @@ export class ScheduledTransactionsService {
     };
   }
 
-  async generatedTransactions(userId: string, scheduledTransactionId: string) {
+  async generatedTransactions(
+    userId: string,
+    scheduledTransactionId: string,
+    filters: ListGeneratedTransactionsQuery,
+  ) {
     await this.findOwnedScheduledTransaction(userId, scheduledTransactionId);
-    const transactions = await this.dataSource.getRepository(Transaction).find({
-      where: {
-        userId,
-        scheduledTransactionId,
-      },
-      relations: {
-        sourceAccount: true,
-        category: true,
-      },
-      order: {
-        date: 'DESC',
-      },
-    });
+    const cursor = decodeCursor(filters.cursor, generatedTransactionCursorSchema);
+    const query = this.dataSource
+      .getRepository(Transaction)
+      .createQueryBuilder('transaction')
+      .leftJoinAndSelect('transaction.sourceAccount', 'sourceAccount')
+      .leftJoinAndSelect('transaction.category', 'category')
+      .where('transaction.userId = :userId', { userId })
+      .andWhere('transaction.scheduledTransactionId = :scheduledTransactionId', { scheduledTransactionId });
 
-    return transactions.map((transaction) => ({
-      id: transaction.id,
-      date: transaction.date,
-      description: transaction.description,
-      amount: Number(transaction.amount),
-      type: transaction.type,
-      account: transaction.sourceAccount.name,
-      category: transaction.category?.name,
-      status: transaction.status,
-    }));
+    if (cursor) {
+      query.andWhere(
+        new Brackets((builder) => {
+          builder
+            .where('transaction.date < :cursorDate', { cursorDate: cursor.date })
+            .orWhere(
+              new Brackets((sameDate) => {
+                sameDate
+                  .where('transaction.date = :cursorDate', { cursorDate: cursor.date })
+                  .andWhere('transaction.id < :cursorId', { cursorId: cursor.id });
+              }),
+            );
+        }),
+      );
+    }
+
+    const transactions = await query
+      .orderBy('transaction.date', 'DESC')
+      .addOrderBy('transaction.id', 'DESC')
+      .take(filters.limit + 1)
+      .getMany();
+
+    return toPaginatedResponse(
+      transactions.map((transaction) => ({
+        id: transaction.id,
+        date: transaction.date,
+        description: transaction.description,
+        amount: Number(transaction.amount),
+        type: transaction.type,
+        account: transaction.sourceAccount.name,
+        category: transaction.category?.name,
+        status: transaction.status,
+      })),
+      filters.limit,
+      (transaction) =>
+        encodeCursor({
+          date: transaction.date,
+          id: transaction.id,
+        }),
+    );
   }
 
   async createInitialScheduledTransactions(userId: string): Promise<void> {

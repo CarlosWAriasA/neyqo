@@ -19,7 +19,9 @@ export type TransactionSource = 'manual' | 'scheduled_transaction' | 'email_sync
 
 @Entity({ name: 'transactions' })
 @Index(['userId', 'date'])
+@Index(['userId', 'date', 'createdAt', 'id'])
 @Index(['userId', 'type', 'status'])
+@Index(['userId', 'status', 'date'])
 @Index(['sourceAccountId'])
 @Index(['destinationAccountId'])
 @Index(['categoryId'])

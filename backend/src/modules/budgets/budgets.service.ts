@@ -1,11 +1,14 @@
 import { DataSource, type EntityManager, In } from 'typeorm';
+import { Brackets } from 'typeorm';
 import { BudgetPeriodRecord, type BudgetPeriodStatus } from '../../entities/budget-period.entity';
 import { Budget, type BudgetPeriod } from '../../entities/budget.entity';
 import { Category } from '../../entities/category.entity';
 import { Transaction } from '../../entities/transaction.entity';
 import { AuthError } from '../auth/auth.service';
-import type { CreateBudgetInput, UpdateBudgetInput } from './budgets.schemas';
+import type { CreateBudgetInput, ListBudgetsQuery, UpdateBudgetInput } from './budgets.schemas';
 import { initialBudgetTemplates } from './initial-budgets';
+import { decodeCursor, encodeCursor, type PaginatedResponse, toPaginatedResponse } from '../../utils/pagination';
+import { z } from 'zod';
 
 type BudgetProgressStatus = 'normal' | 'moderate-warning' | 'important-warning' | 'exceeded';
 
@@ -63,22 +66,80 @@ export interface BudgetResponse {
   updatedAt: string;
 }
 
+export type BudgetListResponse = Omit<BudgetResponse, 'periodHistory' | 'currentExpenses'>;
+
+const budgetCursorSchema = z.object({
+  status: z.string(),
+  createdAt: z.string(),
+  id: z.uuid(),
+});
+
 export class BudgetsService {
   constructor(private readonly dataSource: DataSource) {}
 
-  async list(userId: string): Promise<BudgetResponse[]> {
-    const budgets = await this.dataSource.getRepository(Budget).find({
-      where: { userId },
-      relations: {
-        categories: true,
-      },
-      order: {
-        status: 'ASC',
-        createdAt: 'ASC',
-      },
-    });
+  async list(userId: string, filters: ListBudgetsQuery): Promise<PaginatedResponse<BudgetListResponse>> {
+    const cursor = decodeCursor(filters.cursor, budgetCursorSchema);
+    const query = this.dataSource
+      .getRepository(Budget)
+      .createQueryBuilder('budget')
+      .leftJoinAndSelect('budget.categories', 'category')
+      .where('budget.userId = :userId', { userId });
 
-    return Promise.all(budgets.map((budget) => this.toResponse(budget)));
+    if (filters.status && filters.status !== 'all') {
+      query.andWhere('budget.status = :status', { status: filters.status });
+    }
+
+    if (filters.query) {
+      query.andWhere(
+        new Brackets((builder) => {
+          builder
+            .where('LOWER(budget.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
+            .orWhere('LOWER(budget.description) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
+            .orWhere('LOWER(category.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` });
+        }),
+      );
+    }
+
+    if (cursor) {
+      query.andWhere(
+        new Brackets((builder) => {
+          builder
+            .where('budget.status > :cursorStatus', { cursorStatus: cursor.status })
+            .orWhere(
+              new Brackets((sameStatus) => {
+                sameStatus
+                  .where('budget.status = :cursorStatus', { cursorStatus: cursor.status })
+                  .andWhere('budget.createdAt < :cursorCreatedAt', { cursorCreatedAt: cursor.createdAt });
+              }),
+            )
+            .orWhere(
+              new Brackets((sameStatusAndCreatedAt) => {
+                sameStatusAndCreatedAt
+                  .where('budget.status = :cursorStatus', { cursorStatus: cursor.status })
+                  .andWhere('budget.createdAt = :cursorCreatedAt', { cursorCreatedAt: cursor.createdAt })
+                  .andWhere('budget.id < :cursorId', { cursorId: cursor.id });
+              }),
+            );
+        }),
+      );
+    }
+
+    const budgets = await query
+      .orderBy('budget.status', 'ASC')
+      .addOrderBy('budget.createdAt', 'DESC')
+      .addOrderBy('budget.id', 'DESC')
+      .take(filters.limit + 1)
+      .getMany();
+
+    const responses = await Promise.all(budgets.map((budget) => this.toListResponse(budget)));
+
+    return toPaginatedResponse(responses, filters.limit, (budget) =>
+      encodeCursor({
+        status: budget.recordStatus,
+        createdAt: budget.createdAt,
+        id: budget.id,
+      }),
+    );
   }
 
   async getById(userId: string, budgetId: string): Promise<BudgetResponse> {
@@ -414,6 +475,50 @@ export class BudgetsService {
       periodEnd: currentRange.endDate,
       periodHistory,
       currentExpenses,
+      daysRemaining: this.calculateDaysRemaining(currentRange.endDate),
+      spentAmount,
+      percentageUsed,
+      remainingAmount: maxAmount - spentAmount,
+      status: this.resolveProgressStatus(percentageUsed),
+      recordStatus: budget.status,
+      description: budget.description ?? undefined,
+      createdAt: budget.createdAt.toISOString(),
+      updatedAt: budget.updatedAt.toISOString(),
+    };
+  }
+
+  private async toListResponse(
+    budget: Budget,
+    manager: EntityManager = this.dataSource.manager,
+  ): Promise<BudgetListResponse> {
+    if (budget.status === 'active') {
+      await this.ensurePeriodsUpToCurrent(budget, manager);
+    }
+
+    const currentRange = this.resolveRangeForDate(budget.period, new Date(), this.getBudgetResetConfig(budget));
+    const spentAmount = await this.calculateSpentAmount(budget, currentRange, manager);
+    const maxAmount = Number(budget.maxAmount);
+    const percentageUsed = maxAmount > 0 ? Math.round((spentAmount / maxAmount) * 100) : 0;
+    const categoryIds = budget.categories.map((category) => category.id);
+    const categoryNames = budget.categories.map((category) => category.name);
+
+    return {
+      id: budget.id,
+      name: budget.name,
+      category: categoryNames.join(', '),
+      categoryId: categoryIds[0],
+      categoryIds,
+      categories: budget.categories.map((category) => ({ id: category.id, name: category.name, icon: category.icon })),
+      maxAmount,
+      month: budget.month,
+      year: budget.year,
+      period: budget.period,
+      startDate: this.getBudgetStartDate(budget),
+      resetDayOfMonth: budget.resetDayOfMonth,
+      resetDayOfWeek: budget.resetDayOfWeek,
+      periodLabel: currentRange.label,
+      periodStart: currentRange.startDate,
+      periodEnd: currentRange.endDate,
       daysRemaining: this.calculateDaysRemaining(currentRange.endDate),
       spentAmount,
       percentageUsed,

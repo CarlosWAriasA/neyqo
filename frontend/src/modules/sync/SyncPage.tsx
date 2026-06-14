@@ -1,6 +1,8 @@
-import { RefreshCw } from 'lucide-react';
-import { EmptyState } from '../../components/common/EmptyState';
 import { PageHeader } from '../../components/common/PageHeader';
+import { SyncComingSoon } from './components/SyncComingSoon';
+import { SyncProviderCard } from './components/SyncProviderCard';
+import { SyncSecurityCard } from './components/SyncSecurityCard';
+import { syncProviders } from './sync.constants';
 
 export function SyncPage() {
   return (
@@ -10,11 +12,15 @@ export function SyncPage() {
         description="La conexión con Gmail y Outlook todavía no está disponible."
       />
 
-      <EmptyState
-        icon={RefreshCw}
-        title="Sincronización próximamente"
-        description="Estamos preparando esta sección para conectar correos y detectar movimientos de forma segura. Por ahora puedes registrar tus movimientos manualmente."
-      />
+      <SyncComingSoon />
+
+      <section className="grid gap-4 md:grid-cols-2">
+        {syncProviders.map((provider) => (
+          <SyncProviderCard key={provider.id} provider={provider} />
+        ))}
+      </section>
+
+      <SyncSecurityCard />
     </div>
   );
 }

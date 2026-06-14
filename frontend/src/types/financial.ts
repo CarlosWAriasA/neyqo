@@ -67,8 +67,8 @@ export interface Budget {
   periodLabel: string;
   periodStart: string;
   periodEnd: string;
-  periodHistory: BudgetPeriodSummary[];
-  currentExpenses: BudgetExpense[];
+  periodHistory?: BudgetPeriodSummary[];
+  currentExpenses?: BudgetExpense[];
   daysRemaining: number;
   spentAmount: number;
   percentageUsed: number;
@@ -153,6 +153,17 @@ export interface GeneratedScheduledTransaction {
   account: string;
   category?: string;
   status: 'completed' | 'pending' | 'cancelled';
+}
+
+export interface PageInfo {
+  nextCursor: string | null;
+  hasNextPage: boolean;
+  limit: number;
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  pageInfo: PageInfo;
 }
 
 export interface ExternalConnection {

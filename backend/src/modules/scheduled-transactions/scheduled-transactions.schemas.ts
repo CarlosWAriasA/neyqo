@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { buildPaginationSchema } from '../../utils/pagination';
 
 export const scheduledTransactionParamsSchema = z.object({
   id: z.uuid(),
@@ -94,5 +95,17 @@ export const updateScheduledTransactionSchema = scheduledTransactionBaseSchema
   .superRefine(validateScheduleConfig)
   .refine((value) => Object.keys(value).length > 0, 'Envía al menos un campo para actualizar.');
 
+export const scheduledTransactionStatusSchema = z.enum(['active', 'paused', 'completed', 'inactive']);
+
+export const listScheduledTransactionsQuerySchema = buildPaginationSchema(20).extend({
+  status: scheduledTransactionStatusSchema.or(z.literal('all')).optional(),
+  type: scheduledTransactionTypeSchema.or(z.literal('all')).optional(),
+  query: z.string().trim().max(140).optional(),
+});
+
+export const listGeneratedTransactionsQuerySchema = buildPaginationSchema(30);
+
 export type CreateScheduledTransactionInput = z.infer<typeof createScheduledTransactionSchema>;
 export type UpdateScheduledTransactionInput = z.infer<typeof updateScheduledTransactionSchema>;
+export type ListScheduledTransactionsQuery = z.infer<typeof listScheduledTransactionsQuerySchema>;
+export type ListGeneratedTransactionsQuery = z.infer<typeof listGeneratedTransactionsQuerySchema>;

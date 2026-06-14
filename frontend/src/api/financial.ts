@@ -2,7 +2,7 @@ import {
   mockEmailSyncRuns,
   mockExternalConnections,
 } from '../mocks/financial';
-import type { Account, Budget, BudgetExpense, BudgetPeriodSummary, Category, Transaction } from '../types/financial';
+import type { Account, Budget, BudgetExpense, BudgetPeriodSummary, Category, PaginatedResponse, Transaction } from '../types/financial';
 import type {
   GeneratedScheduledTransaction,
   ScheduledMovement,
@@ -68,6 +68,32 @@ export interface ScheduledTransactionPayload {
   endDate?: string;
 }
 
+export interface PaginationParams {
+  cursor?: string;
+  limit?: number;
+}
+
+export interface TransactionListParams extends PaginationParams {
+  type?: 'all' | Transaction['type'];
+  status?: 'all' | Transaction['status'];
+  dateFrom?: string;
+  dateTo?: string;
+  query?: string;
+  accountId?: string;
+  categoryId?: string;
+}
+
+export interface BudgetListParams extends PaginationParams {
+  status?: 'active' | 'inactive' | 'all';
+  query?: string;
+}
+
+export interface ScheduledMovementListParams extends PaginationParams {
+  status?: 'active' | 'paused' | 'completed' | 'inactive' | 'all';
+  type?: 'income' | 'expense' | 'all';
+  query?: string;
+}
+
 export async function getAccounts() {
   const response = await apiClient.get<{ accounts: Account[] }>('/accounts');
   return response.data.accounts;
@@ -93,9 +119,9 @@ export async function reactivateAccount(accountId: string) {
   return response.data.account;
 }
 
-export async function getTransactions() {
-  const response = await apiClient.get<{ transactions: Transaction[] }>('/transactions');
-  return response.data.transactions;
+export async function getTransactions(params?: TransactionListParams) {
+  const response = await apiClient.get<PaginatedResponse<Transaction>>('/transactions', { params });
+  return response.data;
 }
 
 export async function createTransaction(payload: TransactionPayload) {
@@ -137,9 +163,9 @@ export async function reactivateCategory(categoryId: string) {
   return response.data.category;
 }
 
-export async function getBudgets() {
-  const response = await apiClient.get<{ budgets: Budget[] }>('/budgets');
-  return response.data.budgets;
+export async function getBudgets(params?: BudgetListParams) {
+  const response = await apiClient.get<PaginatedResponse<Budget>>('/budgets', { params });
+  return response.data;
 }
 
 export async function getBudget(budgetId: string) {
@@ -177,9 +203,9 @@ export async function getBudgetExpenses(budgetId: string) {
   return response.data.expenses;
 }
 
-export async function getScheduledMovements() {
-  const response = await apiClient.get<{ scheduledTransactions: ScheduledMovement[] }>('/scheduled-transactions');
-  return response.data.scheduledTransactions;
+export async function getScheduledMovements(params?: ScheduledMovementListParams) {
+  const response = await apiClient.get<PaginatedResponse<ScheduledMovement>>('/scheduled-transactions', { params });
+  return response.data;
 }
 
 export async function getUpcomingScheduledMovements() {
@@ -192,11 +218,12 @@ export async function getScheduledSummary() {
   return response.data.summary;
 }
 
-export async function getGeneratedScheduledTransactions(scheduledTransactionId: string) {
-  const response = await apiClient.get<{ transactions: GeneratedScheduledTransaction[] }>(
+export async function getGeneratedScheduledTransactions(scheduledTransactionId: string, params?: PaginationParams) {
+  const response = await apiClient.get<PaginatedResponse<GeneratedScheduledTransaction>>(
     `/scheduled-transactions/${scheduledTransactionId}/generated-transactions`,
+    { params },
   );
-  return response.data.transactions;
+  return response.data;
 }
 
 export async function createScheduledMovement(payload: ScheduledTransactionPayload) {

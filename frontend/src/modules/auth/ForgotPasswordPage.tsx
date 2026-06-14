@@ -3,28 +3,24 @@ import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
-import { z } from 'zod';
-import { requestPasswordReset } from '../../api/auth';
-import { AuthCard } from '../../components/forms/AuthCard';
-import { Field } from '../../components/forms/Field';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 
-const forgotSchema = z.object({
-  email: z.string().email('Escribe un correo válido.'),
-});
-
-type ForgotValues = z.infer<typeof forgotSchema>;
+import { requestPasswordReset } from '@/api/auth';
+import { AuthCard } from '@/components/forms/AuthCard';
+import { Field } from '@/components/forms/Field';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AUTH_MESSAGES } from '@/modules/auth/auth.constants';
+import { forgotPasswordSchema, type ForgotPasswordValues } from '@/modules/auth/auth.schema';
 
 export function ForgotPasswordPage() {
   const [message, setMessage] = useState('');
   const [loading, setLoading] = useState(false);
-  const form = useForm<ForgotValues>({
-    resolver: zodResolver(forgotSchema),
+  const form = useForm<ForgotPasswordValues>({
+    resolver: zodResolver(forgotPasswordSchema),
     defaultValues: { email: '' },
   });
 
-  const onSubmit = async (values: ForgotValues) => {
+  const onSubmit = async (values: ForgotPasswordValues) => {
     setLoading(true);
     setMessage('');
 
@@ -32,7 +28,7 @@ export function ForgotPasswordPage() {
       const response = await requestPasswordReset(values.email);
       setMessage(response.message);
     } catch {
-      setMessage('Si la cuenta existe, enviaremos instrucciones para continuar.');
+      setMessage(AUTH_MESSAGES.forgotPasswordFallback);
     } finally {
       setLoading(false);
     }

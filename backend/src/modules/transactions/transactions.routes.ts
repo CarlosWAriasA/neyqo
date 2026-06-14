@@ -2,6 +2,7 @@ import type { FastifyPluginAsync } from 'fastify';
 import type { AuthService } from '../auth/auth.service';
 import {
   createTransactionSchema,
+  listTransactionsQuerySchema,
   transactionParamsSchema,
   updateTransactionSchema,
 } from './transactions.schemas';
@@ -27,8 +28,24 @@ export const buildTransactionsRoutes =
     });
 
     app.get('/', async (request, reply) => {
-      const transactions = await transactionsService.list(request.authUser!.id);
-      return reply.code(200).send({ transactions });
+      const parsed = listTransactionsQuerySchema.safeParse(request.query);
+
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send(validationError('Filtros de transacciones inválidos.', parsed.error.flatten().fieldErrors));
+      }
+
+      try {
+        const transactions = await transactionsService.list(request.authUser!.id, parsed.data);
+        return reply.code(200).send(transactions);
+      } catch (error) {
+        if (error instanceof Error && error.message === 'INVALID_CURSOR') {
+          return reply.code(400).send(validationError('Cursor de transacciones inválido.'));
+        }
+
+        throw error;
+      }
     });
 
     app.post('/', async (request, reply) => {

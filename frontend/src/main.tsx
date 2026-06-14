@@ -1,6 +1,7 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { AppProviders } from './app/providers/AppProviders';
+import { registerServiceWorker } from './pwa/registerServiceWorker';
 import { router } from './routes/router';
 import './styles/globals.css';
 
@@ -15,3 +16,5 @@ createRoot(root).render(
     <AppProviders router={router} />
   </StrictMode>,
 );
+
+registerServiceWorker();

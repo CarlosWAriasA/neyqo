@@ -1,33 +1,19 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { z } from 'zod';
-import { register, restoreStoredUser } from '../../api/auth';
-import { AuthCard } from '../../components/forms/AuthCard';
-import { Field } from '../../components/forms/Field';
-import { FormDivider } from '../../components/forms/FormDivider';
-import { SocialAuthButtons } from '../../components/forms/SocialAuthButtons';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 
-const registerSchema = z
-  .object({
-    fullName: z.string().min(2, 'Escribe tu nombre.'),
-    email: z.string().email('Escribe un correo válido.'),
-    password: z.string().min(8, 'Usa al menos 8 caracteres.'),
-    confirmPassword: z.string().min(8, 'Confirma tu contraseña.'),
-    acceptedTerms: z.literal(true, {
-      error: 'Debes aceptar términos y privacidad.',
-    }),
-  })
-  .refine((values) => values.password === values.confirmPassword, {
-    path: ['confirmPassword'],
-    message: 'Las contraseñas no coinciden.',
-  });
-
-type RegisterValues = z.infer<typeof registerSchema>;
+import { register, restoreStoredUser } from '@/api/auth';
+import { AuthCard } from '@/components/forms/AuthCard';
+import { Field } from '@/components/forms/Field';
+import { FormDivider } from '@/components/forms/FormDivider';
+import { SocialAuthButtons } from '@/components/forms/SocialAuthButtons';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AUTH_MESSAGES } from '@/modules/auth/auth.constants';
+import { registerSchema, type RegisterValues } from '@/modules/auth/auth.schema';
+import { PasswordInput } from '@/modules/auth/components/PasswordInput';
 
 export function RegisterPage() {
   const navigate = useNavigate();
@@ -58,7 +44,7 @@ export function RegisterPage() {
       setMessage(response.message);
       setTimeout(() => navigate('/login'), 1200);
     } catch {
-      setError('No pudimos crear la cuenta. Revisa los datos o intenta nuevamente.');
+      setError(AUTH_MESSAGES.registerError);
     } finally {
       setLoading(false);
     }
@@ -74,25 +60,20 @@ export function RegisterPage() {
           <Input type="email" autoComplete="email" placeholder="tu@correo.com" {...form.register('email')} />
         </Field>
         <Field label="Contraseña" error={form.formState.errors.password?.message}>
-          <div className="relative">
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="new-password"
-              className="pr-11"
-              {...form.register('password')}
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-2.5 text-subtle hover:text-text"
-              onClick={() => setShowPassword((value) => !value)}
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+          <PasswordInput
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            autoComplete="new-password"
+            {...form.register('password')}
+          />
         </Field>
         <Field label="Confirmar contraseña" error={form.formState.errors.confirmPassword?.message}>
-          <Input type={showPassword ? 'text' : 'password'} autoComplete="new-password" {...form.register('confirmPassword')} />
+          <PasswordInput
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            autoComplete="new-password"
+            {...form.register('confirmPassword')}
+          />
         </Field>
         <label className="flex items-start gap-2 text-sm text-subtle">
           <input type="checkbox" className="mt-1 h-4 w-4 rounded border-border accent-primary" {...form.register('acceptedTerms')} />

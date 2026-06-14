@@ -1,5 +1,6 @@
 import { apiClient, authStorage, clearSilentRefresh, scheduleSilentRefresh } from './client';
 import type { AuthSession, AuthUser } from '../types/auth';
+import { queryClient } from '../app/providers/queryClient';
 
 export interface LoginPayload {
   email: string;
@@ -17,7 +18,11 @@ export interface AuthActionResponse {
   email?: string;
 }
 
-function persistSession(session: AuthSession, remember = true) {
+function persistSession(session: AuthSession, remember = true, options?: { clearQueryCache?: boolean }) {
+  if (options?.clearQueryCache) {
+    queryClient.clear();
+  }
+
   authStorage.setSession(session.accessToken, session.user, remember);
   scheduleSilentRefresh(session.accessToken);
   return session.user;
@@ -30,7 +35,7 @@ export async function login(payload: LoginPayload, options?: { remember?: boolea
   } else {
     authStorage.clearRememberedEmail();
   }
-  return persistSession(data, options?.remember ?? true);
+  return persistSession(data, options?.remember ?? true, { clearQueryCache: true });
 }
 
 export async function register(payload: RegisterPayload) {
@@ -72,6 +77,7 @@ export async function logout() {
   } finally {
     clearSilentRefresh();
     authStorage.clear();
+    queryClient.clear();
     localStorage.removeItem('neyqo.oauth-result');
   }
 }
@@ -93,6 +99,7 @@ export function restoreStoredUser(): AuthUser | null {
 
 export async function verifyEmail(payload: { email: string; code: string }) {
   const { data } = await apiClient.post<AuthSession>('/auth/verify-email', payload);
+  queryClient.clear();
   authStorage.setSession(data.accessToken, data.user);
   scheduleSilentRefresh(data.accessToken);
   return data.user;

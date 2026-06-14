@@ -37,9 +37,13 @@ function isAllowedFrontendOrigin(origin: string) {
   }
 }
 
-function sanitizeFrontendOrigin(returnTo: string | undefined) {
+function sanitizeOAuthReturnTo(returnTo: string | undefined) {
   if (!returnTo) {
     return undefined;
+  }
+
+  if (returnTo === 'neyqo://auth/oauth/callback') {
+    return returnTo;
   }
 
   try {
@@ -53,7 +57,7 @@ function sanitizeFrontendOrigin(returnTo: string | undefined) {
 function encodeOAuthState(returnTo: string | undefined) {
   const state: OAuthState = {
     nonce: randomBytes(16).toString('hex'),
-    returnTo: sanitizeFrontendOrigin(returnTo),
+    returnTo: sanitizeOAuthReturnTo(returnTo),
   };
 
   return Buffer.from(JSON.stringify(state), 'utf8').toString('base64url');
@@ -68,7 +72,7 @@ function decodeOAuthState(state: string | undefined): OAuthState | undefined {
     const parsed = JSON.parse(Buffer.from(state, 'base64url').toString('utf8')) as Partial<OAuthState>;
     return {
       nonce: typeof parsed.nonce === 'string' ? parsed.nonce : '',
-      returnTo: sanitizeFrontendOrigin(parsed.returnTo),
+      returnTo: sanitizeOAuthReturnTo(parsed.returnTo),
     };
   } catch {
     return undefined;
@@ -83,7 +87,9 @@ function buildOAuthCallbackUrl(
   frontendUrl: string,
   params: Record<string, string | undefined>,
 ) {
-  const url = new URL('/auth/oauth/callback', frontendUrl);
+  const url = frontendUrl === 'neyqo://auth/oauth/callback'
+    ? new URL(frontendUrl)
+    : new URL('/auth/oauth/callback', frontendUrl);
 
   for (const [key, value] of Object.entries(params)) {
     if (value) {

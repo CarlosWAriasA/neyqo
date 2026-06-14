@@ -1,0 +1,42 @@
+{
+  "name": "Neyqo",
+  "short_name": "Neyqo",
+  "description": "Administra tus finanzas personales con claridad y confianza.",
+  "lang": "es",
+  "dir": "ltr",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#F8FAFC",
+  "theme_color": "#0F766E",
+  "categories": ["finance", "productivity"],
+  "icons": [
+    {
+      "src": "/pwa-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    },
+    {
+      "src": "/pwa-maskable-icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Panel",
+      "short_name": "Panel",
+      "description": "Abrir el panel financiero.",
+      "url": "/app/dashboard"
+    },
+    {
+      "name": "Transacciones",
+      "short_name": "Movimientos",
+      "description": "Revisar movimientos recientes.",
+      "url": "/app/transactions"
+    }
+  ]
+}

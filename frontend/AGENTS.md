@@ -77,6 +77,10 @@ The main landing opens authentication in a modal. Direct auth URLs are preserved
 
 Theme preference is persisted in `neyqo.theme` with `light`, `dark`, or `system`. The inline script in `index.html` applies the theme before React renders.
 
+## PWA
+
+The frontend exposes a web app manifest and registers `public/sw.js` only in production builds. The service worker caches the app shell and static assets, but it must not cache `/api` requests or other authenticated backend traffic.
+
 ## Rules
 
 - Keep mock data in `src/mocks`.

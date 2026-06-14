@@ -19,6 +19,7 @@ export type BudgetPeriod = 'weekly' | 'biweekly' | 'monthly';
 @Entity({ name: 'budgets' })
 @Index(['userId', 'month', 'year'])
 @Index(['userId', 'status'])
+@Index(['userId', 'status', 'createdAt', 'id'])
 export class Budget {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

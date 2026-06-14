@@ -1,25 +1,20 @@
 import { zodResolver } from '@hookform/resolvers/zod';
-import { Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
-import { z } from 'zod';
-import { login, restoreStoredUser } from '../../api/auth';
-import { authStorage } from '../../api/client';
-import { AuthCard } from '../../components/forms/AuthCard';
-import { Field } from '../../components/forms/Field';
-import { FormDivider } from '../../components/forms/FormDivider';
-import { SocialAuthButtons } from '../../components/forms/SocialAuthButtons';
-import { Button } from '../../components/ui/button';
-import { Input } from '../../components/ui/input';
 
-const loginSchema = z.object({
-  email: z.string().email('Escribe un correo válido.'),
-  password: z.string().min(1, 'Escribe tu contraseña.'),
-  remember: z.boolean().optional(),
-});
-
-type LoginValues = z.infer<typeof loginSchema>;
+import { login, restoreStoredUser } from '@/api/auth';
+import { authStorage } from '@/api/client';
+import { AuthCard } from '@/components/forms/AuthCard';
+import { Field } from '@/components/forms/Field';
+import { FormDivider } from '@/components/forms/FormDivider';
+import { SocialAuthButtons } from '@/components/forms/SocialAuthButtons';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AUTH_MESSAGES } from '@/modules/auth/auth.constants';
+import { loginSchema, type LoginValues } from '@/modules/auth/auth.schema';
+import { PasswordInput } from '@/modules/auth/components/PasswordInput';
 
 export function LoginPage() {
   const navigate = useNavigate();
@@ -51,7 +46,7 @@ export function LoginPage() {
       );
       navigate('/app/dashboard', { replace: true });
     } catch {
-      setError('No pudimos iniciar sesión. Revisa tu correo, contraseña o verificación pendiente.');
+      setError(AUTH_MESSAGES.loginError);
     } finally {
       setLoading(false);
     }
@@ -70,23 +65,13 @@ export function LoginPage() {
           />
         </Field>
         <Field label="Contraseña" error={form.formState.errors.password?.message}>
-          <div className="relative">
-            <Input
-              type={showPassword ? 'text' : 'password'}
-              autoComplete="current-password"
-              className="pr-11"
-              autoFocus={Boolean(rememberedEmail)}
-              {...form.register('password')}
-            />
-            <button
-              type="button"
-              className="absolute right-3 top-2.5 text-subtle hover:text-text"
-              onClick={() => setShowPassword((value) => !value)}
-              aria-label={showPassword ? 'Ocultar contraseña' : 'Mostrar contraseña'}
-            >
-              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-            </button>
-          </div>
+          <PasswordInput
+            visible={showPassword}
+            onToggle={() => setShowPassword((value) => !value)}
+            autoComplete="current-password"
+            autoFocus={Boolean(rememberedEmail)}
+            {...form.register('password')}
+          />
         </Field>
         <div className="flex items-center justify-between gap-3 text-sm">
           <label className="flex items-center gap-2 text-subtle">

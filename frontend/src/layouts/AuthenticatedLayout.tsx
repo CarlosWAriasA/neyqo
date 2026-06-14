@@ -1,3 +1,4 @@
+import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
 import { toast } from 'sonner';
@@ -6,6 +7,8 @@ import { authStorage } from '../api/client';
 import { ErrorState } from '../components/feedback/ErrorState';
 import { SessionExpired } from '../components/feedback/SessionExpired';
 import { Skeleton } from '../components/common/Skeleton';
+import { prefetchAppData } from '../features/finance/appDataPrefetch';
+import { AppDataPrefetcher } from '../features/finance/AppDataPrefetcher';
 import type { AuthUser } from '../types/auth';
 
 let initializationToken: string | null = null;
@@ -37,9 +40,11 @@ function initializeDataOnce(accessToken: string | null): Promise<AuthUser | null
 }
 
 export function AuthenticatedLayout() {
+  const queryClient = useQueryClient();
   const [sessionExpired, setSessionExpired] = useState(false);
   const [redirectToLogin, setRedirectToLogin] = useState(false);
   const [status, setStatus] = useState<'loading' | 'initializing' | 'ready' | 'error'>('loading');
+  const [currentUser, setCurrentUser] = useState<AuthUser | null>(null);
 
   useEffect(() => {
     let mounted = true;
@@ -86,7 +91,8 @@ export function AuthenticatedLayout() {
           : undefined;
 
         try {
-          await initializeDataOnce(accessToken);
+          const initializedUser = await initializeDataOnce(accessToken);
+          user = initializedUser ?? user;
 
           if (toastTimer !== undefined) {
             window.clearTimeout(toastTimer);
@@ -109,13 +115,17 @@ export function AuthenticatedLayout() {
           }
         }
 
+        await prefetchAppData(queryClient);
+
         if (mounted) {
+          setCurrentUser(user);
           setStatus('ready');
         }
       } catch {
         if (mounted) {
           setSessionExpired(true);
           setRedirectToLogin(true);
+          setCurrentUser(null);
           setStatus('ready');
         }
       }
@@ -130,7 +140,7 @@ export function AuthenticatedLayout() {
       mounted = false;
       window.removeEventListener('neyqo:session-expired', handleExpired);
     };
-  }, []);
+  }, [queryClient]);
 
   if (status === 'loading' || status === 'initializing') {
     return (
@@ -166,6 +176,7 @@ export function AuthenticatedLayout() {
           : 'grid gap-6 lg:h-full lg:min-h-0 lg:grid-rows-[minmax(0,1fr)]'
       }
     >
+      {currentUser ? <AppDataPrefetcher userId={currentUser.id} /> : null}
       {sessionExpired ? <SessionExpired /> : null}
       <div className="lg:min-h-0">
         <Outlet />
