@@ -7,6 +7,7 @@ Neyqo is split into three active pieces:
 - Neyqo backend in `neyqo/backend`: Fastify backend that provides authentication, session, financial APIs, and protected internal endpoints.
 - Neyqo React frontend in `neyqo/frontend`: public landing, authentication screens, and authenticated finance experience.
 - Neyqo worker in `neyqo/neyqo-worker`: independent periodic job runner for scheduled transactions and future email sync work.
+- Neyqo Android in `neyqo/app`: native Android client for the mobile landing, authentication entry points, and future authenticated finance screens.
 
 `generic-login` remains read-only reference only and is not part of the active Neyqo flow.
 
@@ -97,7 +98,7 @@ Mocks live only in `frontend/src/mocks`. `src/api/financial.ts` wraps them behin
 
 ## Future React Native Strategy
 
-Do not share web visual components with React Native. Share concepts instead:
+Do not share web visual components with native mobile clients. Share concepts instead:
 
 - DTO names
 - endpoint names
@@ -107,6 +108,17 @@ Do not share web visual components with React Native. Share concepts instead:
 - documentation of expected responses
 
 If contracts become stable, consider a small shared package for generated API types or schema-derived DTOs.
+
+## Android Structure
+
+The Android project is a Gradle application module under `app`.
+
+- `app/src/main/java/com/neyqo/android`: Java activity code.
+- `app/src/main/res/layout`: Android XML layouts.
+- `app/src/main/res/drawable`: UI backgrounds and simple visual primitives.
+- `app/src/main/res/values`: strings, colors, and themes.
+
+The first mobile screen is a full-screen carousel-style landing page with login and registration entry points in the top bar. Login and registration call the same backend authentication contracts documented for the web client, while keeping email sync permissions separate from normal authentication.
 
 ## Email Sync Boundary
 

@@ -14,6 +14,7 @@
     "worker:build": "npm --prefix neyqo-worker run build",
     "worker:start": "npm --prefix neyqo-worker run start",
     "worker:test": "npm --prefix neyqo-worker run test",
+    "android:build": "gradlew.bat :app:assembleDebug",
     "build": "npm run frontend:build && npm run backend:build && npm run worker:build",
     "lint": "npm run frontend:lint"
   }

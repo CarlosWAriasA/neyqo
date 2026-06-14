@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="neyqo_ink">#0F172A</color>
+    <color name="neyqo_muted">#64748B</color>
+    <color name="neyqo_surface">#F8FAFC</color>
+    <color name="neyqo_card">#FFFFFFFF</color>
+    <color name="neyqo_primary">#0F766E</color>
+    <color name="neyqo_primary_dark">#115E59</color>
+    <color name="neyqo_primary_soft">#CCFBF1</color>
+    <color name="neyqo_accent">#D97706</color>
+    <color name="neyqo_blue">#2563EB</color>
+    <color name="neyqo_line">#E2E8F0</color>
+    <color name="neyqo_error">#DC2626</color>
+    <color name="neyqo_positive">#16A34A</color>
+    <color name="neyqo_danger_soft">#FEE2E2</color>
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

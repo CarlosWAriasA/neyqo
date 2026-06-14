@@ -5,3 +5,12 @@ logs/
 .env.local
 .DS_Store
 npm-debug.log*
+
+# Android / Gradle
+.gradle/
+.idea/
+.classpath
+.project
+.settings/
+local.properties
+**/build/

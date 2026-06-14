@@ -1,0 +1,13 @@
+<resources xmlns:tools="http://schemas.android.com/tools">
+    <style name="Theme.NeyqoAndroid" parent="Theme.MaterialComponents.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/neyqo_primary</item>
+        <item name="colorPrimaryVariant">@color/neyqo_primary_dark</item>
+        <item name="colorOnPrimary">@color/white</item>
+        <item name="colorSecondary">@color/neyqo_accent</item>
+        <item name="colorSecondaryVariant">@color/neyqo_blue</item>
+        <item name="colorOnSecondary">@color/neyqo_ink</item>
+        <item name="android:statusBarColor">?attr/colorPrimaryVariant</item>
+        <item name="android:navigationBarColor">@color/neyqo_surface</item>
+        <item name="android:fontFamily">sans</item>
+    </style>
+</resources>
