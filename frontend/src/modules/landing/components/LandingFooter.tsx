@@ -17,7 +17,7 @@ export function LandingFooter({ year }: LandingFooterProps) {
           <a href="#funcionalidades">Funcionalidades</a>
           <Link to="/privacy">Privacidad</Link>
           <Link to="/terms">Términos</Link>
-          <a href="mailto:contacto@neyqo.app">Contacto</a>
+          <a href="mailto:neyqofinanzaspersonales@gmail.com">Contacto</a>
         </div>
       </div>
     </footer>

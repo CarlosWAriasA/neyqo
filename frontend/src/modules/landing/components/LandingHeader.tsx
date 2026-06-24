@@ -40,12 +40,13 @@ export function LandingHeader({
         </nav>
         <div className="hidden items-center gap-2 md:flex">
           <Button
+            className="sm:[&>svg]:h-6 sm:[&>svg]:w-6"
             variant="ghost"
             size="icon"
             onClick={onThemeToggle}
             aria-label={resolvedTheme === 'dark' ? 'Cambiar a tema claro' : 'Cambiar a tema oscuro'}
           >
-            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
           </Button>
           <Button variant="ghost" onClick={() => onAuthOpen('login')}>
             Iniciar sesión
@@ -54,7 +55,7 @@ export function LandingHeader({
         </div>
         <div className="flex items-center gap-2 md:hidden">
           <Button variant="ghost" size="icon" onClick={onThemeToggle} aria-label="Cambiar tema">
-            {resolvedTheme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+            {resolvedTheme === 'dark' ? <Sun /> : <Moon />}
           </Button>
           <Button variant="ghost" size="icon" onClick={onMenuToggle} aria-label="Abrir menú">
             {menuOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}

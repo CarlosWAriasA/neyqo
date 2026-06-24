@@ -1,4 +1,4 @@
-import { LogOut, ShieldCheck } from 'lucide-react';
+import { Globe2, LogOut, ShieldCheck } from 'lucide-react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
@@ -17,14 +17,25 @@ export function SessionCard({ onLogoutClick }: SessionCardProps) {
         </div>
         <Badge tone="neutral">Activa</Badge>
       </div>
-      <p className="mt-4 text-sm leading-6 text-subtle">
-        Cierra la sesión en este navegador cuando termines de trabajar o compartas el equipo.
-      </p>
-      <div className="mt-5 flex justify-end">
-        <Button variant="danger" onClick={onLogoutClick}>
-          <LogOut className="h-4 w-4" aria-hidden="true" />
-          Cerrar sesión
-        </Button>
+      <div className="mt-5 grid gap-3">
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-border bg-muted/30 p-4">
+          <span className="flex gap-3">
+            <Globe2 className="mt-0.5 h-5 w-5 shrink-0 text-primary" aria-hidden="true" />
+            <span>
+              <span className="block text-sm font-medium text-text">Cerrar sesión en todos los dispositivos</span>
+              <span className="mt-1 block text-sm leading-6 text-subtle">Protege tu cuenta en equipos compartidos.</span>
+            </span>
+          </span>
+          <Button variant="secondary" disabled>
+            En camino
+          </Button>
+        </div>
+        <div className="flex justify-end">
+          <Button variant="danger" onClick={onLogoutClick}>
+            <LogOut className="h-4 w-4" aria-hidden="true" />
+            Cerrar sesión
+          </Button>
+        </div>
       </div>
     </Card>
   );

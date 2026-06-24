@@ -35,6 +35,9 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   currency?: CurrencyCode;
+  destinationAmount?: number;
+  destinationCurrency?: CurrencyCode;
+  exchangeRate?: number;
   sourceAccountId?: string;
   sourceAccount: string;
   destinationAccountId?: string;
@@ -186,4 +189,56 @@ export interface EmailSyncRun {
   detectedTransactions: number;
   importedTransactions: number;
   errorMessage?: string;
+}
+
+export type DominicanBankCode =
+  | 'popular'
+  | 'qik'
+  | 'santa_cruz'
+  | 'banesco'
+  | 'asociacion_popular'
+  | 'lafise'
+  | 'bhd'
+  | 'banreservas'
+  | 'bdi'
+  | 'unknown';
+
+export interface EmailImportRule {
+  id: string;
+  bankCode: DominicanBankCode;
+  accountId: string;
+  accountName: string;
+  categoryId: string;
+  categoryName: string;
+  productKind: 'card' | 'account' | 'unknown';
+  cardLastDigits?: string;
+  merchantPattern?: string;
+  status: EntityStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ImportedTransaction {
+  id: string;
+  provider: 'gmail' | 'outlook';
+  externalMessageId: string;
+  bankCode: DominicanBankCode;
+  eventType: 'purchase' | 'reversal' | 'payment' | 'withdrawal' | 'deposit' | 'transfer' | 'unknown';
+  providerStatus: 'approved' | 'declined' | 'pending' | 'unknown';
+  productName?: string;
+  cardLastDigits?: string;
+  merchant: string;
+  amount: number;
+  currency: CurrencyCode;
+  transactionDate: string;
+  accountId?: string;
+  accountName?: string;
+  categoryId?: string;
+  categoryName?: string;
+  confidence: number;
+  status: 'ready_for_review' | 'needs_review' | 'ignored' | 'imported' | 'failed';
+  reviewNote?: string;
+  transactionId?: string;
+  createdAt: string;
+  updatedAt: string;
 }

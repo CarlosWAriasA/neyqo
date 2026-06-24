@@ -1,4 +1,5 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { lazy, Suspense } from 'react';
 import { OAuthCallbackPage } from './OAuthCallbackPage';
 import { AppLayout } from '../layouts/AppLayout';
 import { AuthLayout } from '../layouts/AuthLayout';
@@ -12,12 +13,14 @@ import { DashboardPage } from '../modules/dashboard/DashboardPage';
 import { LandingPage } from '../modules/landing/LandingPage';
 import { PrivacyPage } from '../modules/legal/PrivacyPage';
 import { TermsPage } from '../modules/legal/TermsPage';
-import { ReportsPage } from '../modules/reports/ReportsPage';
 import { ScheduledPage } from '../modules/scheduled/ScheduledPage';
 import { SettingsPage } from '../modules/settings/SettingsPage';
 import { SyncPage } from '../modules/sync/SyncPage';
 import { TransactionsPage } from '../modules/transactions/TransactionsPage';
 import { AuthEntryRedirect } from './AuthEntryRedirect';
+import { AppRouteSkeleton } from '../layouts/AppRouteSkeleton';
+
+const ReportsPage = lazy(() => import('../modules/reports/ReportsPage').then((module) => ({ default: module.ReportsPage })));
 
 export const router = createBrowserRouter([
   {
@@ -53,7 +56,14 @@ export const router = createBrowserRouter([
           { path: 'budgets', element: <BudgetsPage /> },
           { path: 'scheduled', element: <ScheduledPage /> },
           { path: 'sync', element: <SyncPage /> },
-          { path: 'reports', element: <ReportsPage /> },
+          {
+            path: 'reports',
+            element: (
+              <Suspense fallback={<AppRouteSkeleton pathname="/app/reports" />}>
+                <ReportsPage />
+              </Suspense>
+            ),
+          },
           { path: 'settings', element: <SettingsPage /> },
           { path: '*', element: <Navigate to="/app/dashboard" replace /> },
         ],

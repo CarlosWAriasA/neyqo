@@ -57,6 +57,18 @@ export const resetPasswordSchema = z.object({
     .max(72, 'La contraseña es demasiado larga.'),
 });
 
+export const deleteAccountSchema = z.object({
+  confirmationText: z
+    .string()
+    .trim()
+    .refine((value) => value === 'ELIMINAR MI CUENTA', {
+      message: 'Escribe ELIMINAR MI CUENTA para confirmar.',
+    }),
+  acceptedIrreversibleDeletion: z.literal(true, {
+    error: 'Debes confirmar que leíste y aceptas la eliminación definitiva.',
+  }),
+});
+
 export type RegisterInput = z.infer<typeof registerSchema>;
 export type LoginInput = z.infer<typeof loginSchema>;
 export type GoogleLoginInput = z.infer<typeof googleLoginSchema>;
@@ -64,3 +76,4 @@ export type VerifyEmailInput = z.infer<typeof verifyEmailSchema>;
 export type ResendVerificationCodeInput = z.infer<typeof resendVerificationCodeSchema>;
 export type ForgotPasswordInput = z.infer<typeof forgotPasswordSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
+export type DeleteAccountInput = z.infer<typeof deleteAccountSchema>;

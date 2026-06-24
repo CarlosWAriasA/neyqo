@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { ArrowLeftRight, Plus, Search } from 'lucide-react';
-import { useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
@@ -38,10 +38,12 @@ import {
   type TransactionTypeFilter,
 } from './transactions.schema';
 import {
+  groupTransactionsByDate,
   getTransactionErrorMessage,
   toTransactionFormValues,
   toTransactionPayload,
 } from './transactions.utils';
+import { formatCurrency } from '../../utils/format';
 
 export function TransactionsPage() {
   const [query, setQuery] = useState('');
@@ -72,6 +74,7 @@ export function TransactionsPage() {
     (category) => category.status === 'active' && category.type === selectedType,
   );
   const transactions = flattenPages(transactionsQuery.data?.pages);
+  const transactionGroups = useMemo(() => groupTransactionsByDate(transactions), [transactions]);
 
   const saveTransactionMutation = useMutation({
     mutationFn: (values: TransactionFormSubmitValues) => {
@@ -208,8 +211,34 @@ export function TransactionsPage() {
                 </tr>
               </thead>
               <tbody>
-                {transactions.map((transaction) => (
-                  <TransactionRow
+                {transactionGroups.map((group) => (
+                  <Fragment key={group.key}>
+                    <tr className="border-t border-border bg-canvas/80">
+                      <td colSpan={7} className="px-5 py-3">
+                        <TransactionDateGroupHeader group={group} />
+                      </td>
+                    </tr>
+                    {group.transactions.map((transaction) => (
+                      <TransactionRow
+                        key={transaction.id}
+                        transaction={transaction}
+                        onEdit={() => openEditPanel(transaction)}
+                        onDelete={() => handleDelete(transaction)}
+                        isDeleting={deleteTransactionMutation.isPending}
+                      />
+                    ))}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </Card>
+
+          <section className="grid gap-2 sm:gap-3 lg:hidden">
+            {transactionGroups.map((group) => (
+              <Fragment key={group.key}>
+                <TransactionDateGroupHeader group={group} />
+                {group.transactions.map((transaction) => (
+                  <TransactionCard
                     key={transaction.id}
                     transaction={transaction}
                     onEdit={() => openEditPanel(transaction)}
@@ -217,19 +246,7 @@ export function TransactionsPage() {
                     isDeleting={deleteTransactionMutation.isPending}
                   />
                 ))}
-              </tbody>
-            </table>
-          </Card>
-
-          <section className="grid gap-3 lg:hidden">
-            {transactions.map((transaction) => (
-              <TransactionCard
-                key={transaction.id}
-                transaction={transaction}
-                onEdit={() => openEditPanel(transaction)}
-                onDelete={() => handleDelete(transaction)}
-                isDeleting={deleteTransactionMutation.isPending}
-              />
+              </Fragment>
             ))}
           </section>
         </InfiniteListBoundary>
@@ -248,6 +265,26 @@ export function TransactionsPage() {
           onSubmit={(values) => saveTransactionMutation.mutate(values)}
         />
       ) : null}
+    </div>
+  );
+}
+
+function TransactionDateGroupHeader({ group }: { group: ReturnType<typeof groupTransactionsByDate>[number] }) {
+  return (
+    <div className="flex flex-wrap items-center justify-between gap-2 rounded-panel border border-border bg-surface px-3 py-2 shadow-soft lg:border-0 lg:bg-transparent lg:px-0 lg:py-0 lg:shadow-none">
+      <div className="min-w-0">
+        <h2 className="text-sm font-semibold text-text">{group.title}</h2>
+        <p className="text-xs capitalize text-subtle">{group.subtitle}</p>
+      </div>
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
+        <span>{group.summary.count} movimientos</span>
+        {group.summary.expense > 0 ? (
+          <span className="font-medium text-danger">Gastos {formatCurrency(group.summary.expense)}</span>
+        ) : null}
+        {group.summary.income > 0 ? (
+          <span className="font-medium text-positive">Ingresos {formatCurrency(group.summary.income)}</span>
+        ) : null}
+      </div>
     </div>
   );
 }

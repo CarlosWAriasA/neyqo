@@ -6,6 +6,7 @@ export interface AuthUser {
   emailVerified: boolean;
   hasPasswordAccess: boolean;
   hasGoogleAccess: boolean;
+  hasMicrosoftAccess: boolean;
   avatarUrl?: string;
   initialDataNoticeShown: boolean;
   createdAt: string;

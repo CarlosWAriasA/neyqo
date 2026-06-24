@@ -12,9 +12,9 @@ const typeOptions: Array<{ value: CategoryTypeFilter; label: string }> = [
 ];
 
 const statusOptions: Array<{ value: CategoryStatusFilter; label: string }> = [
+  { value: 'all', label: 'Todas' },
   { value: 'active', label: 'Activas' },
   { value: 'inactive', label: 'Inactivas' },
-  { value: 'all', label: 'Todas' },
 ];
 
 interface CategoryFiltersProps {
@@ -35,7 +35,7 @@ export function CategoryFilters({
   onStatusChange,
 }: CategoryFiltersProps) {
   return (
-    <Card className="grid gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(18rem,1fr)_auto_auto] lg:items-end">
+    <Card className="grid min-w-0 gap-3 sm:grid-cols-2 lg:grid-cols-[minmax(18rem,1fr)_auto_auto] lg:items-end">
       <label className="grid gap-2 text-sm font-medium text-text sm:col-span-2 lg:col-span-1">
         Buscar
         <span className="relative">
@@ -78,9 +78,9 @@ export function CategoryFilters({
 
 function FilterGroup({ label, children }: { label: string; children: ReactNode }) {
   return (
-    <div className="grid gap-2">
+    <div className="grid min-w-0 gap-2">
       <span className="text-sm font-medium text-text">{label}</span>
-      <div className="flex h-10 w-full rounded-panel border border-border bg-muted p-1 lg:w-max">{children}</div>
+      <div className="flex h-10 w-full min-w-0 rounded-panel border border-border bg-muted p-1 lg:w-max">{children}</div>
     </div>
   );
 }
@@ -98,7 +98,7 @@ function FilterButton({
     <button
       type="button"
       className={cn(
-        'h-8 min-w-20 flex-1 rounded-[6px] px-3 text-sm font-medium text-subtle transition hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary lg:flex-none',
+        'h-8 min-w-0 flex-1 truncate rounded-[6px] px-2 text-sm font-medium text-subtle transition hover:text-text focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary sm:px-3 lg:min-w-20 lg:flex-none',
         active && 'bg-primary text-white shadow-soft hover:text-white',
       )}
       aria-pressed={active}

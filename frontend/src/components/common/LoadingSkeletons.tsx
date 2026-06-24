@@ -14,9 +14,9 @@ export function StatGridSkeleton({ count = 3 }: StatGridSkeletonProps) {
   return (
     <section className={count === 4 ? 'grid grid-cols-2 gap-2 md:grid-cols-4 md:gap-4' : 'grid grid-cols-3 gap-2 md:gap-4'}>
       {Array.from({ length: count }).map((_, index) => (
-        <Card key={index} className="p-3 sm:p-5">
-          <Skeleton className="h-4 w-20 sm:w-32" />
-          <Skeleton className="mt-2 h-6 w-16 sm:mt-3 sm:h-8 sm:w-24" />
+        <Card key={index} className="min-w-0 p-3 sm:p-5">
+          <Skeleton className="h-4 w-4/5 max-w-32" />
+          <Skeleton className="mt-2 h-6 w-3/5 max-w-24 sm:mt-3 sm:h-8" />
         </Card>
       ))}
     </section>
@@ -25,7 +25,7 @@ export function StatGridSkeleton({ count = 3 }: StatGridSkeletonProps) {
 
 export function CardGridSkeleton({ count = 6, variant = 'standard' }: CardGridSkeletonProps) {
   return (
-    <section className="grid gap-4 pb-2 md:grid-cols-2 xl:grid-cols-3">
+    <section className="grid min-w-0 gap-4 pb-2 md:grid-cols-2 xl:grid-cols-3">
       {Array.from({ length: count }).map((_, index) => (
         <EntityCardSkeleton key={index} variant={variant} />
       ))}
@@ -63,7 +63,7 @@ export function TransactionListSkeleton({ rows = 8 }: { rows?: number }) {
         </table>
       </Card>
 
-      <section className="grid gap-3 lg:hidden">
+      <section className="grid min-w-0 gap-3 lg:hidden">
         {Array.from({ length: Math.min(rows, 5) }).map((_, index) => (
           <EntityCardSkeleton key={index} variant="compact" />
         ))}
@@ -87,23 +87,23 @@ function EntityCardSkeleton({ variant }: { variant: CardGridSkeletonProps['varia
   const compact = variant === 'compact';
 
   return (
-    <Card className="grid gap-4">
-      <div className="flex items-start justify-between gap-3">
+    <Card className="grid min-w-0 gap-4 overflow-hidden">
+      <div className="flex min-w-0 items-start justify-between gap-3">
         <div className="flex min-w-0 flex-1 gap-3">
           <Skeleton className="h-10 w-10 shrink-0" />
           <div className="min-w-0 flex-1">
-            <Skeleton className="h-5 w-36" />
-            <Skeleton className="mt-2 h-4 w-48 max-w-full" />
+            <Skeleton className="h-5 w-3/5 max-w-36" />
+            <Skeleton className="mt-2 h-4 w-4/5 max-w-48" />
           </div>
         </div>
-        <Skeleton className="h-7 w-20 shrink-0 rounded-full" />
+        <Skeleton className="h-7 w-16 shrink-0 rounded-full sm:w-20" />
       </div>
 
       {compact ? null : (
         <>
           <div>
-            <Skeleton className="h-4 w-24" />
-            <Skeleton className="mt-2 h-8 w-36" />
+            <Skeleton className="h-4 w-2/5 max-w-24" />
+            <Skeleton className="mt-2 h-8 w-3/5 max-w-36" />
           </div>
           <Skeleton className="h-10 w-full" />
         </>
@@ -116,13 +116,13 @@ function EntityCardSkeleton({ variant }: { variant: CardGridSkeletonProps['varia
             <Skeleton className="h-10" />
             <Skeleton className="h-10" />
           </div>
-          <Skeleton className="h-4 w-40" />
+          <Skeleton className="h-4 w-2/3 max-w-40" />
         </>
       ) : null}
 
       <div className="flex gap-2">
-        <Skeleton className="h-10 w-28" />
-        <Skeleton className="h-10 w-32" />
+        <Skeleton className="h-10 min-w-0 flex-1 sm:w-28 sm:flex-none" />
+        <Skeleton className="h-10 min-w-0 flex-1 sm:w-32 sm:flex-none" />
       </div>
     </Card>
   );

@@ -49,6 +49,15 @@ export class Transaction {
   @Column({ type: 'varchar', length: 3 })
   currency!: string;
 
+  @Column({ name: 'destination_amount', type: 'numeric', precision: 14, scale: 2, nullable: true })
+  destinationAmount!: string | null;
+
+  @Column({ name: 'destination_currency', type: 'varchar', length: 3, nullable: true })
+  destinationCurrency!: string | null;
+
+  @Column({ name: 'exchange_rate', type: 'numeric', precision: 18, scale: 8, nullable: true })
+  exchangeRate!: string | null;
+
   @Column({ name: 'source_account_id', type: 'uuid' })
   sourceAccountId!: string;
 

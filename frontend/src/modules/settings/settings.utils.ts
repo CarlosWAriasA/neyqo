@@ -16,3 +16,8 @@ export function getPreferenceErrorMessage(error: unknown) {
   const axiosError = error as AxiosError<{ message?: string }>;
   return axiosError.response?.data?.message || 'No pudimos guardar tus preferencias. Intenta nuevamente.';
 }
+
+export function getAccountActionErrorMessage(error: unknown) {
+  const axiosError = error as AxiosError<{ message?: string }>;
+  return axiosError.response?.data?.message || 'No pudimos completar la acción de cuenta. Intenta nuevamente.';
+}

@@ -5,5 +5,5 @@ interface SkeletonProps {
 }
 
 export function Skeleton({ className }: SkeletonProps) {
-  return <div className={cn('animate-pulse rounded-panel bg-muted', className)} />;
+  return <div aria-hidden="true" className={cn('skeleton-shimmer rounded-panel', className)} />;
 }

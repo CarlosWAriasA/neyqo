@@ -1,5 +1,6 @@
 import type { FastifyPluginAsync } from 'fastify';
 import type { AuthService } from '../auth/auth.service';
+import { requireAuth, validationError } from '../shared/route-helpers';
 import {
   createScheduledTransactionSchema,
   listGeneratedTransactionsQuerySchema,
@@ -9,24 +10,10 @@ import {
 } from './scheduled-transactions.schemas';
 import type { ScheduledTransactionsService } from './scheduled-transactions.service';
 
-function validationError(message: string, fieldErrors?: Record<string, string[] | undefined>) {
-  return {
-    message,
-    errors: fieldErrors,
-  };
-}
-
 export const buildScheduledTransactionsRoutes =
   (scheduledTransactionsService: ScheduledTransactionsService, authService: AuthService): FastifyPluginAsync =>
   async (app) => {
-    app.addHook('preHandler', async (request) => {
-      const authorizationHeader = request.headers.authorization;
-      const accessToken = authorizationHeader?.startsWith('Bearer ')
-        ? authorizationHeader.slice(7)
-        : undefined;
-
-      request.authUser = await authService.getCurrentUser(accessToken);
-    });
+    app.addHook('preHandler', requireAuth(authService));
 
     app.get('/', async (request, reply) => {
       const parsed = listScheduledTransactionsQuerySchema.safeParse(request.query);

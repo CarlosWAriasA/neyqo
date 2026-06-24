@@ -6,25 +6,12 @@ import {
   updateCategorySchema,
 } from './categories.schemas';
 import type { CategoriesService } from './categories.service';
-
-function validationError(message: string, fieldErrors?: Record<string, string[] | undefined>) {
-  return {
-    message,
-    errors: fieldErrors,
-  };
-}
+import { requireAuth, validationError } from '../shared/route-helpers';
 
 export const buildCategoriesRoutes =
   (categoriesService: CategoriesService, authService: AuthService): FastifyPluginAsync =>
   async (app) => {
-    app.addHook('preHandler', async (request) => {
-      const authorizationHeader = request.headers.authorization;
-      const accessToken = authorizationHeader?.startsWith('Bearer ')
-        ? authorizationHeader.slice(7)
-        : undefined;
-
-      request.authUser = await authService.getCurrentUser(accessToken);
-    });
+    app.addHook('preHandler', requireAuth(authService));
 
     app.get('/', async (request, reply) => {
       const categories = await categoriesService.list(request.authUser!.id);

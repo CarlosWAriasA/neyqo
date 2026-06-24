@@ -88,5 +88,8 @@ The frontend exposes a web app manifest and registers `public/sw.js` only in pro
 - Do not request email-reading permissions during login or registration.
 - Do not show technical OAuth, token, scope, consent, or provider-permission copy in public UI.
 - Keep business logic out of visual components when adding real endpoints.
+- Keep HTTP calls behind `src/api` helpers and consume finance data through TanStack Query hooks in `src/features/finance`.
+- Prefer domain hook files such as `accountsHooks.ts`, `transactionsHooks.ts`, `budgetsHooks.ts`, and `scheduledHooks.ts`; keep `hooks.ts` as a compatibility export surface.
+- Email sync connection UI starts OAuth from `/app/sync` through `/api/sync/oauth/:provider/start`; do not reuse authentication OAuth routes for mail permissions.
 - Respect `prefers-reduced-motion`.
 - Update this file when frontend architecture changes.

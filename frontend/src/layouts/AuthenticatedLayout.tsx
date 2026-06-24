@@ -1,15 +1,15 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { useEffect, useState } from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 import { getCurrentUser, initializeUserData, refreshSession, restoreStoredUser } from '../api/auth';
 import { authStorage } from '../api/client';
 import { ErrorState } from '../components/feedback/ErrorState';
 import { SessionExpired } from '../components/feedback/SessionExpired';
-import { Skeleton } from '../components/common/Skeleton';
 import { prefetchAppData } from '../features/finance/appDataPrefetch';
 import { AppDataPrefetcher } from '../features/finance/AppDataPrefetcher';
 import type { AuthUser } from '../types/auth';
+import { AppRouteSkeleton } from './AppRouteSkeleton';
 
 let initializationToken: string | null = null;
 let initializationPromise: Promise<AuthUser | null> | null = null;
@@ -40,6 +40,7 @@ function initializeDataOnce(accessToken: string | null): Promise<AuthUser | null
 }
 
 export function AuthenticatedLayout() {
+  const location = useLocation();
   const queryClient = useQueryClient();
   const [sessionExpired, setSessionExpired] = useState(false);
   const [redirectToLogin, setRedirectToLogin] = useState(false);
@@ -143,21 +144,7 @@ export function AuthenticatedLayout() {
   }, [queryClient]);
 
   if (status === 'loading' || status === 'initializing') {
-    return (
-      <div className="grid gap-6 lg:h-full lg:min-h-0">
-        <Skeleton className="h-28" />
-        {status === 'initializing' ? (
-          <div className="rounded-panel border border-border bg-surface p-4 text-sm text-subtle shadow-soft">
-            Preparando tus cuentas, categorías y programados iniciales...
-          </div>
-        ) : null}
-        <div className="grid gap-4 md:grid-cols-3">
-          <Skeleton className="h-36" />
-          <Skeleton className="h-36" />
-          <Skeleton className="h-36" />
-        </div>
-      </div>
-    );
+    return <AppRouteSkeleton pathname={location.pathname} initializing={status === 'initializing'} />;
   }
 
   if (status === 'error') {

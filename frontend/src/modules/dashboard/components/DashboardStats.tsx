@@ -16,15 +16,15 @@ export function DashboardStats({ summary, activeAccountCount, loading = false }:
     return (
       <section className="grid grid-cols-2 gap-2 md:gap-4 xl:grid-cols-4">
         {['balance', 'income', 'expense', 'difference'].map((item) => (
-          <div key={item} className="min-h-36 rounded-panel border border-border bg-surface p-5 shadow-soft">
-            <div className="flex items-start justify-between gap-4">
-              <div className="w-full">
-                <Skeleton className="h-4 w-28" />
-                <Skeleton className="mt-3 h-8 w-36" />
+          <div key={item} className="min-h-36 min-w-0 rounded-panel border border-border bg-surface p-3 shadow-soft sm:p-5">
+            <div className="flex min-w-0 items-start justify-between gap-3 sm:gap-4">
+              <div className="min-w-0 flex-1">
+                <Skeleton className="h-4 w-4/5 max-w-28" />
+                <Skeleton className="mt-3 h-8 w-full max-w-36" />
               </div>
               <Skeleton className="h-9 w-9 shrink-0" />
             </div>
-            <Skeleton className="mt-4 h-4 w-40" />
+            <Skeleton className="mt-4 h-4 w-full max-w-40" />
           </div>
         ))}
       </section>

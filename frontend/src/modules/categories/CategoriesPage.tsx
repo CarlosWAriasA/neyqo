@@ -39,7 +39,7 @@ import {
 
 export function CategoriesPage() {
   const [typeFilter, setTypeFilter] = useState<CategoryTypeFilter>('all');
-  const [statusFilter, setStatusFilter] = useState<CategoryStatusFilter>('active');
+  const [statusFilter, setStatusFilter] = useState<CategoryStatusFilter>('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<Category | null>(null);

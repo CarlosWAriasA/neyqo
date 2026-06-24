@@ -1,8 +1,9 @@
 import { randomBytes } from 'crypto';
-import type { FastifyPluginAsync } from 'fastify';
+import type { FastifyPluginAsync, FastifyReply, FastifyRequest } from 'fastify';
 import { env } from '../../config/env';
 import {
   forgotPasswordSchema,
+  deleteAccountSchema,
   googleLoginSchema,
   loginSchema,
   registerSchema,
@@ -11,13 +12,9 @@ import {
   verifyEmailSchema,
 } from './auth.schemas';
 import { AuthError, type AuthService, type AuthSessionResponse } from './auth.service';
-
-function validationError(message: string, fieldErrors?: Record<string, string[] | undefined>) {
-  return {
-    message,
-    errors: fieldErrors,
-  };
-}
+import type { AuthAbuseProtection } from './auth-abuse-protection';
+import { validationError } from '../shared/route-helpers';
+import { hashLogValue, logSecurityEvent } from '../../utils/file-logger';
 
 interface OAuthState {
   nonce: string;
@@ -110,10 +107,45 @@ function encodeSession(session: AuthSessionResponse) {
   ).toString('base64url');
 }
 
+const oauthStateCookieName = 'neyqo.oauth-state';
+
+function setOAuthStateCookie(reply: FastifyReply, state: string) {
+  reply.setCookie(oauthStateCookieName, state, {
+    httpOnly: true,
+    sameSite: 'lax',
+    secure: env.cookieSecure,
+    path: '/api/auth/oauth',
+    domain: env.cookieDomain,
+    maxAge: 600,
+  });
+}
+
+function clearOAuthStateCookie(reply: FastifyReply) {
+  reply.clearCookie(oauthStateCookieName, {
+    sameSite: 'lax',
+    secure: env.cookieSecure,
+    path: '/api/auth/oauth',
+    domain: env.cookieDomain,
+  });
+}
+
+function hasValidOAuthState(request: FastifyRequest, state: string | undefined) {
+  return Boolean(state && request.cookies[oauthStateCookieName] === state);
+}
+
 export const buildAuthRoutes =
-  (authService: AuthService): FastifyPluginAsync =>
+  (authService: AuthService, authAbuseProtection: AuthAbuseProtection): FastifyPluginAsync =>
   async (app) => {
     app.post('/register', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'register', env.authWriteRateLimitMax);
+
+      if (authAbuseProtection.hasRegistrationHoneypotValue(request.body)) {
+        logSecurityEvent('auth.register.honeypot_triggered', request);
+        return reply.code(202).send({
+          message: 'Te enviamos un codigo para confirmar tu correo.',
+        });
+      }
+
       const parsed = registerSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -123,10 +155,18 @@ export const buildAuthRoutes =
       }
 
       const result = await authService.register(parsed.data);
+      logSecurityEvent(
+        'auth.register.accepted',
+        request,
+        { emailHash: hashLogValue(parsed.data.email) },
+        'info',
+      );
       return reply.code(201).send(result);
     });
 
     app.post('/verify-email', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'verify-email', env.authCodeRateLimitMax);
+
       const parsed = verifyEmailSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -135,11 +175,28 @@ export const buildAuthRoutes =
           .send(validationError('Datos de verificación inválidos.', parsed.error.flatten().fieldErrors));
       }
 
-      const session = await authService.verifyEmail(parsed.data, reply);
-      return reply.code(200).send(session);
+      await authAbuseProtection.assertCodeActionAllowed(request, parsed.data.email, 'verify-email');
+
+      try {
+        const session = await authService.verifyEmail(parsed.data, reply);
+        await authAbuseProtection.recordCodeActionSuccess(request, parsed.data.email, 'verify-email');
+        logSecurityEvent(
+          'auth.verify_email.success',
+          request,
+          { emailHash: hashLogValue(parsed.data.email), userId: session.user.id },
+          'info',
+        );
+        return reply.code(200).send(session);
+      } catch (error) {
+        await authAbuseProtection.recordCodeActionFailure(request, parsed.data.email, 'verify-email');
+        logSecurityEvent('auth.verify_email.failure', request, { emailHash: hashLogValue(parsed.data.email) });
+        throw error;
+      }
     });
 
     app.post('/verify-email/resend', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'verify-email-resend', env.authCodeRateLimitMax);
+
       const parsed = resendVerificationCodeSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -148,11 +205,21 @@ export const buildAuthRoutes =
           .send(validationError('Datos de correo inválidos.', parsed.error.flatten().fieldErrors));
       }
 
+      await authAbuseProtection.assertCodeActionAllowed(request, parsed.data.email, 'resend-verification');
+      await authAbuseProtection.recordCodeActionAttempt(request, parsed.data.email, 'resend-verification');
       const result = await authService.resendEmailVerificationCode(parsed.data);
+      logSecurityEvent(
+        'auth.verify_email.resend_requested',
+        request,
+        { emailHash: hashLogValue(parsed.data.email) },
+        'info',
+      );
       return reply.code(200).send(result);
     });
 
     app.post('/login', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'login', env.authLoginRateLimitMax);
+
       const parsed = loginSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -161,11 +228,28 @@ export const buildAuthRoutes =
           .send(validationError('Datos de login inválidos.', parsed.error.flatten().fieldErrors));
       }
 
-      const session = await authService.login(parsed.data, reply);
-      return reply.code(200).send(session);
+      await authAbuseProtection.assertLoginAllowed(request, parsed.data.email);
+
+      try {
+        const session = await authService.login(parsed.data, reply);
+        await authAbuseProtection.recordLoginSuccess(request, parsed.data.email);
+        logSecurityEvent(
+          'auth.login.success',
+          request,
+          { emailHash: hashLogValue(parsed.data.email), userId: session.user.id },
+          'info',
+        );
+        return reply.code(200).send(session);
+      } catch (error) {
+        await authAbuseProtection.recordLoginFailure(request, parsed.data.email);
+        logSecurityEvent('auth.login.failure', request, { emailHash: hashLogValue(parsed.data.email) });
+        throw error;
+      }
     });
 
     app.post('/google', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'google-token-login', env.authWriteRateLimitMax);
+
       const parsed = googleLoginSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -175,10 +259,13 @@ export const buildAuthRoutes =
       }
 
       const session = await authService.loginWithGoogle(parsed.data, reply);
+      logSecurityEvent('auth.google_token_login.success', request, { userId: session.user.id }, 'info');
       return reply.code(200).send(session);
     });
 
     app.get('/oauth/google/start', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'google-oauth-start', env.authWriteRateLimitMax);
+
       if (!env.googleClientId || !env.googleClientSecret || !env.googleAuthRedirectUri) {
         return reply.code(501).send({ message: 'Google OAuth no está configurado.' });
       }
@@ -186,12 +273,27 @@ export const buildAuthRoutes =
       const query = request.query as { returnTo?: string };
       const state = encodeOAuthState(query.returnTo);
       const authUrl = authService.buildGoogleAuthUrl(state);
+      setOAuthStateCookie(reply, state);
       return reply.redirect(authUrl);
     });
 
     app.get('/oauth/google/callback', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'google-oauth-callback', env.authWriteRateLimitMax);
+
       const query = request.query as { code?: string; state?: string; error?: string };
       const frontendUrl = resolveFrontendUrl(query.state);
+      const validState = hasValidOAuthState(request, query.state);
+      clearOAuthStateCookie(reply);
+
+      if (!validState) {
+        logSecurityEvent('auth.google_oauth.invalid_state', request);
+        return reply.redirect(
+          buildOAuthCallbackUrl(frontendUrl, {
+            error: 'auth_failed',
+            provider: 'google',
+          }),
+        );
+      }
 
       if (query.error || !query.code) {
         return reply.redirect(
@@ -205,6 +307,7 @@ export const buildAuthRoutes =
       try {
         const accessToken = await authService.exchangeGoogleCode(query.code);
         const session = await authService.loginWithGoogle({ accessToken }, reply);
+        logSecurityEvent('auth.google_oauth.success', request, { userId: session.user.id }, 'info');
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
             provider: 'google',
@@ -213,6 +316,7 @@ export const buildAuthRoutes =
         );
       } catch (error) {
         request.log.warn({ error }, 'Google OAuth callback failed.');
+        logSecurityEvent('auth.google_oauth.failure', request);
         const callbackError = error instanceof AuthError && error.statusCode === 409
           ? 'account_exists'
           : 'auth_failed';
@@ -226,6 +330,8 @@ export const buildAuthRoutes =
     });
 
     app.get('/oauth/microsoft/start', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'microsoft-oauth-start', env.authWriteRateLimitMax);
+
       if (!env.microsoftClientId || !env.microsoftClientSecret || !env.microsoftAuthRedirectUri) {
         return reply.code(501).send({ message: 'Microsoft OAuth no está configurado.' });
       }
@@ -233,12 +339,27 @@ export const buildAuthRoutes =
       const query = request.query as { returnTo?: string };
       const state = encodeOAuthState(query.returnTo);
       const authUrl = authService.buildMicrosoftAuthUrl(state);
+      setOAuthStateCookie(reply, state);
       return reply.redirect(authUrl);
     });
 
     app.get('/oauth/microsoft/callback', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'microsoft-oauth-callback', env.authWriteRateLimitMax);
+
       const query = request.query as { code?: string; state?: string; error?: string };
       const frontendUrl = resolveFrontendUrl(query.state);
+      const validState = hasValidOAuthState(request, query.state);
+      clearOAuthStateCookie(reply);
+
+      if (!validState) {
+        logSecurityEvent('auth.microsoft_oauth.invalid_state', request);
+        return reply.redirect(
+          buildOAuthCallbackUrl(frontendUrl, {
+            error: 'auth_failed',
+            provider: 'microsoft',
+          }),
+        );
+      }
 
       if (query.error || !query.code) {
         return reply.redirect(
@@ -253,6 +374,7 @@ export const buildAuthRoutes =
         const accessToken = await authService.exchangeMicrosoftCode(query.code);
         const profile = await authService.getMicrosoftUserProfile(accessToken);
         const session = await authService.loginWithMicrosoft(profile, reply);
+        logSecurityEvent('auth.microsoft_oauth.success', request, { userId: session.user.id }, 'info');
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
             provider: 'microsoft',
@@ -261,6 +383,7 @@ export const buildAuthRoutes =
         );
       } catch (error) {
         request.log.warn({ error }, 'Microsoft OAuth callback failed.');
+        logSecurityEvent('auth.microsoft_oauth.failure', request);
         const callbackError = error instanceof AuthError && error.statusCode === 409
           ? 'account_exists'
           : 'auth_failed';
@@ -274,6 +397,8 @@ export const buildAuthRoutes =
     });
 
     app.post('/password/forgot', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'password-forgot', env.authCodeRateLimitMax);
+
       const parsed = forgotPasswordSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -282,11 +407,21 @@ export const buildAuthRoutes =
           .send(validationError('Datos de recuperación inválidos.', parsed.error.flatten().fieldErrors));
       }
 
+      await authAbuseProtection.assertCodeActionAllowed(request, parsed.data.email, 'forgot-password');
+      await authAbuseProtection.recordCodeActionAttempt(request, parsed.data.email, 'forgot-password');
       const result = await authService.requestPasswordReset(parsed.data);
+      logSecurityEvent(
+        'auth.password_reset.requested',
+        request,
+        { emailHash: hashLogValue(parsed.data.email) },
+        'info',
+      );
       return reply.code(200).send(result);
     });
 
     app.post('/password/reset', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'password-reset', env.authCodeRateLimitMax);
+
       const parsed = resetPasswordSchema.safeParse(request.body);
 
       if (!parsed.success) {
@@ -300,19 +435,58 @@ export const buildAuthRoutes =
           );
       }
 
-      const result = await authService.resetPassword(parsed.data);
-      return reply.code(200).send(result);
+      await authAbuseProtection.assertCodeActionAllowed(request, parsed.data.email, 'reset-password');
+
+      try {
+        const result = await authService.resetPassword(parsed.data);
+        await authAbuseProtection.recordCodeActionSuccess(request, parsed.data.email, 'reset-password');
+        logSecurityEvent(
+          'auth.password_reset.completed',
+          request,
+          { emailHash: hashLogValue(parsed.data.email) },
+          'info',
+        );
+        return reply.code(200).send(result);
+      } catch (error) {
+        await authAbuseProtection.recordCodeActionFailure(request, parsed.data.email, 'reset-password');
+        logSecurityEvent('auth.password_reset.failure', request, { emailHash: hashLogValue(parsed.data.email) });
+        throw error;
+      }
     });
 
     app.post('/refresh', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'refresh', env.authRefreshRateLimitMax);
+
       const refreshToken = request.cookies[env.jwtRefreshCookieName];
       const session = await authService.refreshSession(refreshToken, reply);
       return reply.code(200).send(session);
     });
 
     app.post('/logout', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'logout', env.authRefreshRateLimitMax);
+
       const refreshToken = request.cookies[env.jwtRefreshCookieName];
       await authService.logout(refreshToken, reply);
+      return reply.code(204).send();
+    });
+
+    app.delete('/account', async (request, reply) => {
+      await authAbuseProtection.consumeRateLimit(request, 'delete-account', env.authWriteRateLimitMax);
+
+      const parsed = deleteAccountSchema.safeParse(request.body);
+
+      if (!parsed.success) {
+        return reply
+          .code(400)
+          .send(validationError('Confirmación de eliminación inválida.', parsed.error.flatten().fieldErrors));
+      }
+
+      const authorizationHeader = request.headers.authorization;
+      const accessToken = authorizationHeader?.startsWith('Bearer ')
+        ? authorizationHeader.slice(7)
+        : undefined;
+      const deletedUser = await authService.deleteOwnAccount(accessToken, parsed.data, reply);
+      logSecurityEvent('auth.account_deleted', request, { userId: deletedUser.userId }, 'info');
       return reply.code(204).send();
     });
 

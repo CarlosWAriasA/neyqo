@@ -1,8 +1,8 @@
 import { Save } from 'lucide-react';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { logout, restoreStoredUser } from '../../api/auth';
+import { deleteAccount, logout, restoreStoredUser } from '../../api/auth';
 import { updateUserPreferences } from '../../api/preferences';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Skeleton } from '../../components/common/Skeleton';
@@ -14,16 +14,24 @@ import {
   type UserPreferences,
 } from '../../config/userPreferences';
 import { usePreferences } from '../../features/finance/hooks';
+import { financeQueryKeys } from '../../features/finance/queryKeys';
 import { useTheme } from '../../theme/theme-context';
-import { CalendarInfoCard } from './components/CalendarInfoCard';
+import { LegalCard } from './components/LegalCard';
 import { LogoutDialog } from './components/LogoutDialog';
+import { CurrencyCard } from './components/CurrencyCard';
+import { DataBackupCard } from './components/DataBackupCard';
+import { DeleteAccountDialog } from './components/DeleteAccountDialog';
+import { IntegrationsSettingsCard } from './components/IntegrationsSettingsCard';
+import { NotificationSettingsCard } from './components/NotificationSettingsCard';
 import { PreferencesCard } from './components/PreferencesCard';
 import { ProfileCard } from './components/ProfileCard';
+import { SecurityPrivacyCard } from './components/SecurityPrivacyCard';
 import { SessionCard } from './components/SessionCard';
-import { getPreferenceErrorMessage, toUserPreferences } from './settings.utils';
+import { getAccountActionErrorMessage, getPreferenceErrorMessage, toUserPreferences } from './settings.utils';
 
 export function SettingsPage() {
   const { preference, setPreference } = useTheme();
+  const queryClient = useQueryClient();
   const user = restoreStoredUser();
   const localPreferences = useMemo(
     () => ({
@@ -36,11 +44,13 @@ export function SettingsPage() {
   const [savedPreferences, setSavedPreferences] = useState<UserPreferences>(localPreferences);
   const [preferences, setPreferences] = useState<UserPreferences>(localPreferences);
   const [logoutOpen, setLogoutOpen] = useState(false);
+  const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
   const savePreferencesMutation = useMutation({
     mutationFn: updateUserPreferences,
     onSuccess: (serverPreferences) => {
       const nextPreferences = toUserPreferences(serverPreferences);
+      queryClient.setQueryData(financeQueryKeys.preferences, serverPreferences);
       saveUserPreferences(nextPreferences);
       setSavedPreferences(nextPreferences);
       setPreferences(nextPreferences);
@@ -52,6 +62,16 @@ export function SettingsPage() {
     },
   });
   const hasChanges = JSON.stringify(preferences) !== JSON.stringify(savedPreferences);
+  const deleteAccountMutation = useMutation({
+    mutationFn: deleteAccount,
+    onSuccess: () => {
+      toast.success('Tu cuenta fue eliminada.');
+      window.location.href = '/';
+    },
+    onError: (error) => {
+      toast.error(getAccountActionErrorMessage(error));
+    },
+  });
 
   useEffect(() => {
     if (!preferencesQuery.data) {
@@ -90,7 +110,7 @@ export function SettingsPage() {
     <div className="grid gap-6">
       <PageHeader
         title="Configuración"
-        description="Ajusta cómo Neyqo presenta tu información y administra la sesión activa."
+        description="Cuenta, preferencias y seguridad."
         actions={
           <>
             {preferencesQuery.isLoading ? <Skeleton className="h-10 w-40" /> : null}
@@ -105,19 +125,33 @@ export function SettingsPage() {
       {preferencesQuery.isError ? (
         <ErrorState
           title="No pudimos cargar tus preferencias"
-          description="Puedes seguir usando la copia local y reintentar cuando el servidor esté disponible."
+          description="Puedes seguir usando tus ajustes guardados y reintentar en unos segundos."
           onRetry={() => void preferencesQuery.refetch()}
         />
       ) : null}
 
       <section className="grid gap-4 xl:grid-cols-[0.85fr_1.15fr]">
-        <ProfileCard user={user} />
+        <ProfileCard user={user} onDeleteAccountClick={() => setDeleteAccountOpen(true)} />
         <PreferencesCard preferences={preferences} onChange={updatePreference} />
       </section>
 
+      <section className="grid gap-4 xl:grid-cols-[1.05fr_0.95fr]">
+        <CurrencyCard preferences={preferences} onChange={updatePreference} />
+        <DataBackupCard />
+      </section>
+
       <section className="grid gap-4 xl:grid-cols-2">
-        <CalendarInfoCard />
+        <SecurityPrivacyCard preferences={preferences} onChange={updatePreference} />
+        <NotificationSettingsCard preferences={preferences} onChange={updatePreference} />
+      </section>
+
+      <section className="grid gap-4 xl:grid-cols-2">
+        <IntegrationsSettingsCard />
         <SessionCard onLogoutClick={() => setLogoutOpen(true)} />
+      </section>
+
+      <section>
+        <LegalCard />
       </section>
 
       {logoutOpen ? (
@@ -125,6 +159,14 @@ export function SettingsPage() {
           pending={logoutPending}
           onClose={() => setLogoutOpen(false)}
           onConfirm={() => void handleLogout()}
+        />
+      ) : null}
+
+      {deleteAccountOpen ? (
+        <DeleteAccountDialog
+          pending={deleteAccountMutation.isPending}
+          onClose={() => setDeleteAccountOpen(false)}
+          onConfirm={(payload) => deleteAccountMutation.mutate(payload)}
         />
       ) : null}
     </div>

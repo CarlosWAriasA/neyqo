@@ -18,6 +18,7 @@ The original source was `C:\Users\carlo\Programming\generic-login\backend`. The 
 - `POST /api/auth/password/reset`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
+- `DELETE /api/auth/account`
 - `GET /api/auth/me`
 - `GET /api/auth/oauth/google/start` placeholder
 - `GET /api/auth/oauth/google/callback` placeholder
@@ -46,6 +47,7 @@ The original source was `C:\Users\carlo\Programming\generic-login\backend`. The 
 - `PATCH /api/budgets/:id/reactivate`
 - `GET /api/preferences`
 - `PATCH /api/preferences`
+- `GET /api/exchange-rates/quote`
 - `POST /internal/transactions`
 - `GET /api/scheduled-transactions`
 - `GET /api/scheduled-transactions/upcoming`

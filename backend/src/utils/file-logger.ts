@@ -1,4 +1,5 @@
 import { appendFileSync, mkdirSync } from 'fs';
+import { createHash } from 'crypto';
 import { join, resolve } from 'path';
 import type { FastifyRequest } from 'fastify';
 import { env } from '../config/env';
@@ -14,7 +15,9 @@ interface BaseLogEntry {
 
 interface RequestLogContext {
   method: string;
+  ip: string;
   reqId: string;
+  userAgent?: string;
   url: string;
   userId?: string;
 }
@@ -41,7 +44,9 @@ function getRequestContext(request?: FastifyRequest): RequestLogContext | undefi
 
   return {
     method: request.method,
+    ip: request.ip,
     reqId: request.id,
+    userAgent: request.headers['user-agent'],
     url: request.url,
     userId: request.authUser?.id,
   };
@@ -67,6 +72,27 @@ export function logAppEvent(message: string, context?: Record<string, unknown>) 
     message,
     timestamp: new Date().toISOString(),
     context,
+  });
+}
+
+export function hashLogValue(value: string): string {
+  return createHash('sha256').update(value.trim().toLowerCase()).digest('hex');
+}
+
+export function logSecurityEvent(
+  eventType: string,
+  request?: FastifyRequest,
+  context?: Record<string, unknown>,
+  level: LogLevel = 'warn',
+) {
+  writeLog('security.log', {
+    level,
+    message: eventType,
+    timestamp: new Date().toISOString(),
+    context: {
+      ...context,
+      request: getRequestContext(request),
+    },
   });
 }
 

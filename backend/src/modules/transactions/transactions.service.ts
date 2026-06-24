@@ -1,23 +1,28 @@
 import type { EntityManager } from 'typeorm';
-import { Brackets, DataSource, QueryFailedError } from 'typeorm';
+import { DataSource, QueryFailedError } from 'typeorm';
 import { Account } from '../../entities/account.entity';
 import { Category } from '../../entities/category.entity';
 import { Transaction } from '../../entities/transaction.entity';
 import { AuthError } from '../auth/auth.service';
+import { formatMoney } from '../shared/money';
+import { TransactionBalanceService } from './transaction-balance.service';
+import { TransactionsRepository } from './transactions.repository';
 import type {
   CreateInternalTransactionInput,
   CreateTransactionInput,
   ListTransactionsQuery,
   UpdateTransactionInput,
 } from './transactions.schemas';
-import { decodeCursor, encodeCursor, type PaginatedResponse, toPaginatedResponse } from '../../utils/pagination';
-import { z } from 'zod';
+import type { PaginatedResponse } from '../../utils/pagination';
 
 export interface TransactionResponse {
   id: string;
   type: Transaction['type'];
   amount: number;
   currency: string;
+  destinationAmount?: number;
+  destinationCurrency?: string;
+  exchangeRate?: number;
   sourceAccountId: string;
   sourceAccount: string;
   destinationAccountId?: string;
@@ -41,6 +46,9 @@ export interface InternalTransactionResponse {
 interface ResolvedTransactionInput {
   type: Transaction['type'];
   amount: string;
+  destinationAmount: string | null;
+  destinationCurrency: string | null;
+  exchangeRate: string | null;
   sourceAccount: Account;
   destinationAccount: Account | null;
   category: Category | null;
@@ -50,117 +58,24 @@ interface ResolvedTransactionInput {
   note: string | null;
 }
 
-const transactionCursorSchema = z.object({
-  date: z.string(),
-  createdAt: z.string(),
-  id: z.uuid(),
-});
-
 export class TransactionsService {
-  constructor(private readonly dataSource: DataSource) {}
+  constructor(
+    private readonly dataSource: DataSource,
+    private readonly transactionsRepository = new TransactionsRepository(dataSource),
+    private readonly balanceService = new TransactionBalanceService(),
+  ) {}
 
   async list(userId: string, filters: ListTransactionsQuery): Promise<PaginatedResponse<TransactionResponse>> {
-    const cursor = decodeCursor(filters.cursor, transactionCursorSchema);
-    const query = this.dataSource
-      .getRepository(Transaction)
-      .createQueryBuilder('transaction')
-      .leftJoinAndSelect('transaction.sourceAccount', 'sourceAccount')
-      .leftJoinAndSelect('transaction.destinationAccount', 'destinationAccount')
-      .leftJoinAndSelect('transaction.category', 'category')
-      .where('transaction.userId = :userId', { userId });
+    const transactions = await this.transactionsRepository.list(userId, filters);
 
-    if (filters.type && filters.type !== 'all') {
-      query.andWhere('transaction.type = :type', { type: filters.type });
-    }
-
-    if (filters.status && filters.status !== 'all') {
-      query.andWhere('transaction.status = :status', { status: filters.status });
-    }
-
-    if (filters.dateFrom) {
-      query.andWhere('transaction.date >= :dateFrom', { dateFrom: filters.dateFrom });
-    }
-
-    if (filters.dateTo) {
-      query.andWhere('transaction.date <= :dateTo', { dateTo: filters.dateTo });
-    }
-
-    if (filters.accountId) {
-      query.andWhere(
-        new Brackets((builder) => {
-          builder
-            .where('transaction.sourceAccountId = :accountId', { accountId: filters.accountId })
-            .orWhere('transaction.destinationAccountId = :accountId', { accountId: filters.accountId });
-        }),
-      );
-    }
-
-    if (filters.categoryId) {
-      query.andWhere('transaction.categoryId = :categoryId', { categoryId: filters.categoryId });
-    }
-
-    if (filters.query) {
-      query.andWhere(
-        new Brackets((builder) => {
-          builder
-            .where('LOWER(transaction.description) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
-            .orWhere('LOWER(transaction.note) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
-            .orWhere('LOWER(sourceAccount.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
-            .orWhere('LOWER(destinationAccount.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` })
-            .orWhere('LOWER(category.name) LIKE :query', { query: `%${filters.query!.toLowerCase()}%` });
-        }),
-      );
-    }
-
-    if (cursor) {
-      query.andWhere(
-        new Brackets((builder) => {
-          builder
-            .where('transaction.date < :cursorDate', { cursorDate: cursor.date })
-            .orWhere(
-              new Brackets((sameDate) => {
-                sameDate
-                  .where('transaction.date = :cursorDate', { cursorDate: cursor.date })
-                  .andWhere('transaction.createdAt < :cursorCreatedAt', {
-                    cursorCreatedAt: cursor.createdAt,
-                  });
-              }),
-            )
-            .orWhere(
-              new Brackets((sameDateAndCreatedAt) => {
-                sameDateAndCreatedAt
-                  .where('transaction.date = :cursorDate', { cursorDate: cursor.date })
-                  .andWhere('transaction.createdAt = :cursorCreatedAt', {
-                    cursorCreatedAt: cursor.createdAt,
-                  })
-                  .andWhere('transaction.id < :cursorId', { cursorId: cursor.id });
-              }),
-            );
-        }),
-      );
-    }
-
-    const rows = await query
-      .orderBy('transaction.date', 'DESC')
-      .addOrderBy('transaction.createdAt', 'DESC')
-      .addOrderBy('transaction.id', 'DESC')
-      .take(filters.limit + 1)
-      .getMany();
-
-    return toPaginatedResponse(
-      rows.map((transaction) => this.toResponse(transaction)),
-      filters.limit,
-      (transaction) =>
-        encodeCursor({
-          date: transaction.date,
-          createdAt: transaction.createdAt,
-          id: transaction.id,
-        }),
-    );
+    return {
+      items: transactions.items.map((transaction) => this.toResponse(transaction)),
+      pageInfo: transactions.pageInfo,
+    };
   }
 
   async getById(userId: string, transactionId: string): Promise<TransactionResponse> {
-    const transaction = await this.findOwnedTransaction(userId, transactionId);
+    const transaction = await this.transactionsRepository.findOwnedTransaction(userId, transactionId);
     return this.toResponse(transaction);
   }
 
@@ -179,7 +94,7 @@ export class TransactionsService {
       payload.scheduledTransactionId &&
       payload.scheduledExecutionDate
     ) {
-      const existingTransaction = await this.findByScheduledExecution(
+      const existingTransaction = await this.transactionsRepository.findByScheduledExecution(
         payload.scheduledTransactionId,
         payload.scheduledExecutionDate,
       );
@@ -211,7 +126,7 @@ export class TransactionsService {
         payload.scheduledTransactionId &&
         payload.scheduledExecutionDate
       ) {
-        const existingTransaction = await this.findByScheduledExecution(
+        const existingTransaction = await this.transactionsRepository.findByScheduledExecution(
           payload.scheduledTransactionId,
           payload.scheduledExecutionDate,
         );
@@ -240,6 +155,9 @@ export class TransactionsService {
         type: resolved.type,
         amount: resolved.amount,
         currency: resolved.sourceAccount.currency,
+        destinationAmount: resolved.destinationAmount,
+        destinationCurrency: resolved.destinationCurrency,
+        exchangeRate: resolved.exchangeRate,
         sourceAccountId: resolved.sourceAccount.id,
         destinationAccountId: resolved.destinationAccount?.id ?? null,
         categoryId: resolved.category?.id ?? null,
@@ -254,11 +172,11 @@ export class TransactionsService {
       });
 
       if (transaction.status === 'completed') {
-        await this.applyBalanceDelta(manager, resolved);
+        await this.balanceService.apply(manager, resolved);
       }
 
       const savedTransaction = await manager.save(Transaction, transaction);
-      return this.toResponse(await this.findOwnedTransaction(userId, savedTransaction.id, manager));
+      return this.toResponse(await this.transactionsRepository.findOwnedTransaction(userId, savedTransaction.id, manager));
     });
   }
 
@@ -268,10 +186,10 @@ export class TransactionsService {
     payload: UpdateTransactionInput,
   ): Promise<TransactionResponse> {
     return this.dataSource.transaction(async (manager) => {
-      const transaction = await this.findOwnedTransaction(userId, transactionId, manager);
+      const transaction = await this.transactionsRepository.findOwnedTransaction(userId, transactionId, manager);
 
       if (transaction.status === 'completed') {
-        await this.reverseTransactionBalance(manager, transaction);
+        await this.balanceService.reverse(manager, transaction);
       }
 
       const nextType = payload.type ?? transaction.type;
@@ -279,6 +197,9 @@ export class TransactionsService {
       const nextInput = {
         type: nextType,
         amount: payload.amount ?? Number(transaction.amount),
+        destinationAmount: payload.destinationAmount ?? (
+          transaction.destinationAmount === null ? undefined : Number(transaction.destinationAmount)
+        ),
         sourceAccountId: payload.sourceAccountId ?? transaction.sourceAccountId,
         destinationAccountId: this.resolveNextDestinationAccountId(payload, transaction, nextType),
         categoryId: this.resolveNextCategoryId(payload, transaction, nextType, typeChanged),
@@ -292,6 +213,9 @@ export class TransactionsService {
       transaction.type = resolved.type;
       transaction.amount = resolved.amount;
       transaction.currency = resolved.sourceAccount.currency;
+      transaction.destinationAmount = resolved.destinationAmount;
+      transaction.destinationCurrency = resolved.destinationCurrency;
+      transaction.exchangeRate = resolved.exchangeRate;
       transaction.sourceAccountId = resolved.sourceAccount.id;
       transaction.destinationAccountId = resolved.destinationAccount?.id ?? null;
       transaction.categoryId = resolved.category?.id ?? null;
@@ -301,20 +225,20 @@ export class TransactionsService {
       transaction.note = resolved.note;
 
       if (transaction.status === 'completed') {
-        await this.applyBalanceDelta(manager, resolved);
+        await this.balanceService.apply(manager, resolved);
       }
 
       const savedTransaction = await manager.save(Transaction, transaction);
-      return this.toResponse(await this.findOwnedTransaction(userId, savedTransaction.id, manager));
+      return this.toResponse(await this.transactionsRepository.findOwnedTransaction(userId, savedTransaction.id, manager));
     });
   }
 
   async delete(userId: string, transactionId: string): Promise<void> {
     await this.dataSource.transaction(async (manager) => {
-      const transaction = await this.findOwnedTransaction(userId, transactionId, manager);
+      const transaction = await this.transactionsRepository.findOwnedTransaction(userId, transactionId, manager);
 
       if (transaction.status === 'completed') {
-        await this.reverseTransactionBalance(manager, transaction);
+        await this.balanceService.reverse(manager, transaction);
       }
 
       await manager.delete(Transaction, { id: transaction.id });
@@ -326,9 +250,9 @@ export class TransactionsService {
     userId: string,
     payload: CreateTransactionInput,
   ): Promise<ResolvedTransactionInput> {
-    const sourceAccount = await this.findActiveAccount(manager, userId, payload.sourceAccountId, 'origen');
+    const sourceAccount = await this.transactionsRepository.findActiveAccount(manager, userId, payload.sourceAccountId, 'origen');
     const destinationAccount = payload.destinationAccountId
-      ? await this.findActiveAccount(manager, userId, payload.destinationAccountId, 'destino')
+      ? await this.transactionsRepository.findActiveAccount(manager, userId, payload.destinationAccountId, 'destino')
       : null;
     let category: Category | null = null;
 
@@ -341,9 +265,22 @@ export class TransactionsService {
         throw new AuthError(400, 'La cuenta destino debe ser diferente a la cuenta origen.');
       }
 
-      if (destinationAccount.currency !== sourceAccount.currency) {
-        throw new AuthError(400, 'Solo puedes transferir entre cuentas con la misma moneda.');
-      }
+      const destinationAmount = this.resolveDestinationAmount(payload, sourceAccount, destinationAccount);
+
+      return {
+        type: payload.type,
+        amount: formatMoney(payload.amount),
+        destinationAmount: formatMoney(destinationAmount),
+        destinationCurrency: destinationAccount.currency,
+        exchangeRate: formatExchangeRate(destinationAmount / payload.amount),
+        sourceAccount,
+        destinationAccount,
+        category,
+        description: payload.description,
+        date: payload.date,
+        status: payload.status,
+        note: payload.note || null,
+      };
     } else {
       if (destinationAccount) {
         throw new AuthError(400, 'La cuenta destino solo se usa en transferencias.');
@@ -353,12 +290,15 @@ export class TransactionsService {
         throw new AuthError(400, 'Selecciona una categoría.');
       }
 
-      category = await this.findActiveCategory(manager, userId, payload.categoryId, payload.type);
+      category = await this.transactionsRepository.findActiveCategory(manager, userId, payload.categoryId, payload.type);
     }
 
     return {
       type: payload.type,
-      amount: this.formatMoney(payload.amount),
+      amount: formatMoney(payload.amount),
+      destinationAmount: null,
+      destinationCurrency: null,
+      exchangeRate: null,
       sourceAccount,
       destinationAccount,
       category,
@@ -383,6 +323,22 @@ export class TransactionsService {
       : payload.destinationAccountId;
   }
 
+  private resolveDestinationAmount(
+    payload: CreateTransactionInput,
+    sourceAccount: Account,
+    destinationAccount: Account,
+  ): number {
+    if (sourceAccount.currency === destinationAccount.currency) {
+      return payload.amount;
+    }
+
+    if (!payload.destinationAmount) {
+      throw new AuthError(400, 'Indica el monto que recibirá la cuenta destino.');
+    }
+
+    return payload.destinationAmount;
+  }
+
   private resolveNextCategoryId(
     payload: UpdateTransactionInput,
     transaction: Transaction,
@@ -398,156 +354,6 @@ export class TransactionsService {
     }
 
     return typeChanged ? undefined : transaction.categoryId ?? undefined;
-  }
-
-  private async findActiveAccount(
-    manager: EntityManager,
-    userId: string,
-    accountId: string,
-    label: string,
-  ): Promise<Account> {
-    const account = await manager.findOne(Account, {
-      where: {
-        id: accountId,
-        userId,
-      },
-    });
-
-    if (!account) {
-      throw new AuthError(404, `No encontramos la cuenta ${label}.`);
-    }
-
-    if (account.status !== 'active') {
-      throw new AuthError(400, `La cuenta ${label} está inactiva.`);
-    }
-
-    return account;
-  }
-
-  private async findActiveCategory(
-    manager: EntityManager,
-    userId: string,
-    categoryId: string,
-    type: 'income' | 'expense',
-  ): Promise<Category> {
-    const category = await manager.findOne(Category, {
-      where: {
-        id: categoryId,
-        userId,
-      },
-    });
-
-    if (!category) {
-      throw new AuthError(404, 'No encontramos esa categoría.');
-    }
-
-    if (category.status !== 'active') {
-      throw new AuthError(400, 'La categoría está inactiva.');
-    }
-
-    if (category.type !== type) {
-      throw new AuthError(400, 'La categoría no coincide con el tipo de transacción.');
-    }
-
-    return category;
-  }
-
-  private async findOwnedTransaction(
-    userId: string,
-    transactionId: string,
-    manager: EntityManager = this.dataSource.manager,
-  ): Promise<Transaction> {
-    const transaction = await manager.findOne(Transaction, {
-      where: {
-        id: transactionId,
-        userId,
-      },
-      relations: {
-        sourceAccount: true,
-        destinationAccount: true,
-        category: true,
-      },
-    });
-
-    if (!transaction) {
-      throw new AuthError(404, 'No encontramos esa transacción.');
-    }
-
-    return transaction;
-  }
-
-  private async findByScheduledExecution(
-    scheduledTransactionId: string,
-    scheduledExecutionDate: string,
-  ): Promise<Transaction | null> {
-    return this.dataSource.getRepository(Transaction).findOne({
-      where: {
-        scheduledTransactionId,
-        scheduledExecutionDate,
-      },
-      relations: {
-        sourceAccount: true,
-        destinationAccount: true,
-        category: true,
-      },
-    });
-  }
-
-  private async applyBalanceDelta(
-    manager: EntityManager,
-    transaction: ResolvedTransactionInput,
-  ): Promise<void> {
-    const amount = Number(transaction.amount);
-
-    if (transaction.type === 'income') {
-      await this.updateAccountBalance(manager, transaction.sourceAccount, amount);
-      return;
-    }
-
-    if (transaction.type === 'expense') {
-      await this.updateAccountBalance(manager, transaction.sourceAccount, -amount);
-      return;
-    }
-
-    await this.updateAccountBalance(manager, transaction.sourceAccount, -amount);
-    await this.updateAccountBalance(manager, transaction.destinationAccount!, amount);
-  }
-
-  private async reverseTransactionBalance(
-    manager: EntityManager,
-    transaction: Transaction,
-  ): Promise<void> {
-    const amount = Number(transaction.amount);
-
-    if (transaction.type === 'income') {
-      await this.updateAccountBalance(manager, transaction.sourceAccount, -amount);
-      return;
-    }
-
-    if (transaction.type === 'expense') {
-      await this.updateAccountBalance(manager, transaction.sourceAccount, amount);
-      return;
-    }
-
-    if (!transaction.destinationAccount) {
-      throw new AuthError(400, 'La transferencia no tiene cuenta destino.');
-    }
-
-    await this.updateAccountBalance(manager, transaction.sourceAccount, amount);
-    await this.updateAccountBalance(manager, transaction.destinationAccount, -amount);
-  }
-
-  private async updateAccountBalance(
-    manager: EntityManager,
-    account: Account,
-    delta: number,
-  ): Promise<void> {
-    account.currentBalance = this.formatMoney(Number(account.currentBalance) + delta);
-    await manager.save(Account, account);
-  }
-
-  private formatMoney(value: number): string {
-    return value.toFixed(2);
   }
 
   private isUniqueViolation(error: unknown): boolean {
@@ -566,6 +372,9 @@ export class TransactionsService {
       type: transaction.type,
       amount: Number(transaction.amount),
       currency: transaction.currency,
+      destinationAmount: transaction.destinationAmount === null ? undefined : Number(transaction.destinationAmount),
+      destinationCurrency: transaction.destinationCurrency ?? undefined,
+      exchangeRate: transaction.exchangeRate === null ? undefined : Number(transaction.exchangeRate),
       sourceAccountId: transaction.sourceAccountId,
       sourceAccount: transaction.sourceAccount.name,
       destinationAccountId: transaction.destinationAccountId ?? undefined,
@@ -581,4 +390,8 @@ export class TransactionsService {
       updatedAt: transaction.updatedAt.toISOString(),
     };
   }
+}
+
+function formatExchangeRate(value: number): string {
+  return value.toFixed(8);
 }

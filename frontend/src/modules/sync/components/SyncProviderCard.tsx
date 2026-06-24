@@ -1,15 +1,21 @@
 import { Badge } from '../../../components/ui/badge';
+import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
+import type { ExternalConnection } from '../../../types/financial';
 import type { syncProviders } from '../sync.constants';
 
 type SyncProvider = (typeof syncProviders)[number];
 
 interface SyncProviderCardProps {
   provider: SyncProvider;
+  connection?: ExternalConnection;
+  connecting: boolean;
+  onConnect: () => void;
 }
 
-export function SyncProviderCard({ provider }: SyncProviderCardProps) {
+export function SyncProviderCard({ provider, connection, connecting, onConnect }: SyncProviderCardProps) {
   const Icon = provider.icon;
+  const connected = connection?.status === 'connected';
 
   return (
     <Card className="grid gap-4">
@@ -23,8 +29,12 @@ export function SyncProviderCard({ provider }: SyncProviderCardProps) {
             <p className="mt-1 text-sm leading-6 text-subtle">{provider.description}</p>
           </div>
         </div>
-        <Badge tone="neutral">Próximamente</Badge>
+        <Badge tone={connected ? 'income' : 'neutral'}>{connected ? 'Conectado' : 'Sin conectar'}</Badge>
       </div>
+      {connection ? <p className="truncate text-sm font-medium text-text">{connection.email}</p> : null}
+      <Button type="button" variant={connected ? 'secondary' : 'primary'} onClick={onConnect} disabled={connecting}>
+        {connecting ? 'Conectando...' : connected ? 'Actualizar conexión' : 'Conectar correo'}
+      </Button>
     </Card>
   );
 }

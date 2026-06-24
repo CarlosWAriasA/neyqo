@@ -82,6 +82,20 @@ export async function logout() {
   }
 }
 
+export async function deleteAccount(payload: {
+  confirmationText: string;
+  acceptedIrreversibleDeletion: boolean;
+}) {
+  try {
+    await apiClient.delete('/auth/account', { data: payload });
+  } finally {
+    clearSilentRefresh();
+    authStorage.clear();
+    queryClient.clear();
+    localStorage.removeItem('neyqo.oauth-result');
+  }
+}
+
 export function restoreStoredUser(): AuthUser | null {
   const rawSession = authStorage.getSession();
 

@@ -11,7 +11,7 @@ export const categorySchema = z.object({
 export type CategoryFormValues = z.input<typeof categorySchema>;
 export type CategoryFormSubmitValues = z.output<typeof categorySchema>;
 export type CategoryTypeFilter = 'all' | 'income' | 'expense';
-export type CategoryStatusFilter = 'active' | 'inactive' | 'all';
+export type CategoryStatusFilter = 'all' | 'active' | 'inactive';
 
 export const emptyCategoryValues: CategoryFormValues = {
   name: '',

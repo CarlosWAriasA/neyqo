@@ -14,6 +14,7 @@ export const createTransactionSchema = z.object({
   amount: z.coerce.number().finite().positive('El monto debe ser mayor que cero.').max(999_999_999.99),
   sourceAccountId: z.uuid(),
   destinationAccountId: z.uuid().optional(),
+  destinationAmount: z.coerce.number().finite().positive('El monto destino debe ser mayor que cero.').max(999_999_999.99).optional(),
   categoryId: z.uuid().optional(),
   description: z.string().trim().min(2).max(140),
   date: z.iso.date(),

@@ -1,4 +1,4 @@
-import { Edit, Play, Power } from 'lucide-react';
+import { Edit, Eye, Play, Power } from 'lucide-react';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
@@ -93,22 +93,33 @@ export function BudgetCard({
         })}
       </div>
 
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 border-t border-border pt-3">
         <Button className="flex-1 sm:flex-none" variant="secondary" size="sm" onClick={onOpenDetail}>
-          Ver detalle
+          <Eye aria-hidden="true" />
+          Detalles
         </Button>
         <Button variant="secondary" size="sm" onClick={onEdit}>
-          <Edit className="h-4 w-4" aria-hidden="true" />
+          <Edit aria-hidden="true" />
           <span className="sr-only sm:not-sr-only">Editar</span>
         </Button>
         {budget.recordStatus === 'active' ? (
-          <Button variant="ghost" size="sm" disabled={isChangingStatus} onClick={onDeactivate}>
-            <Power className="h-4 w-4" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isChangingStatus}
+            onClick={onDeactivate}
+          >
+            <Power aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">{isChangingStatus ? 'Desactivando...' : 'Desactivar'}</span>
           </Button>
         ) : (
-          <Button variant="ghost" size="sm" disabled={isChangingStatus} onClick={onReactivate}>
-            <Play className="h-4 w-4" aria-hidden="true" />
+          <Button
+            variant="ghost"
+            size="sm"
+            disabled={isChangingStatus}
+            onClick={onReactivate}
+          >
+            <Play aria-hidden="true" />
             <span className="sr-only sm:not-sr-only">{isChangingStatus ? 'Reactivando...' : 'Reactivar'}</span>
           </Button>
         )}

@@ -6,7 +6,7 @@ import { BrandMark } from './BrandMark';
 export function Sidebar() {
   return (
     <aside className="hidden h-screen w-72 shrink-0 overflow-y-auto border-r border-border bg-surface px-4 py-5 lg:block">
-      <BrandMark />
+      <BrandMark to="/app/dashboard" />
       <nav className="mt-8 grid gap-1" aria-label="Navegación principal">
         {navigationItems.map((item) => (
           <NavLink

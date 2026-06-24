@@ -1,8 +1,17 @@
-import {
-  mockEmailSyncRuns,
-  mockExternalConnections,
-} from '../mocks/financial';
-import type { Account, Budget, BudgetExpense, BudgetPeriodSummary, Category, PaginatedResponse, Transaction } from '../types/financial';
+import { mockEmailSyncRuns } from '../mocks/financial';
+import type {
+  Account,
+  Budget,
+  BudgetExpense,
+  BudgetPeriodSummary,
+  Category,
+  DominicanBankCode,
+  EmailImportRule,
+  ExternalConnection,
+  ImportedTransaction,
+  PaginatedResponse,
+  Transaction,
+} from '../types/financial';
 import type {
   GeneratedScheduledTransaction,
   ScheduledMovement,
@@ -32,6 +41,7 @@ export interface TransactionPayload {
   amount: number;
   sourceAccountId: string;
   destinationAccountId?: string;
+  destinationAmount?: number;
   categoryId?: string;
   description: string;
   date: string;
@@ -92,6 +102,32 @@ export interface ScheduledMovementListParams extends PaginationParams {
   status?: 'active' | 'paused' | 'completed' | 'inactive' | 'all';
   type?: 'income' | 'expense' | 'all';
   query?: string;
+}
+
+export interface EmailImportRulePayload {
+  bankCode: DominicanBankCode;
+  accountId: string;
+  categoryId: string;
+  productKind?: 'card' | 'account' | 'unknown';
+  cardLastDigits?: string;
+  merchantPattern?: string;
+}
+
+export interface EmailImportRuleListParams {
+  bankCode?: DominicanBankCode;
+  status?: 'active' | 'inactive' | 'all';
+}
+
+export interface ImportedTransactionListParams extends PaginationParams {
+  status?: ImportedTransaction['status'] | 'all';
+  bankCode?: DominicanBankCode;
+}
+
+export interface ImportedTransactionUpdatePayload {
+  status?: 'ignored' | 'needs_review';
+  accountId?: string;
+  categoryId?: string;
+  reviewNote?: string;
 }
 
 export async function getAccounts() {
@@ -261,9 +297,45 @@ export async function deactivateScheduledMovement(scheduledTransactionId: string
 }
 
 export async function getExternalConnections() {
-  return mockExternalConnections;
+  const response = await apiClient.get<{ connections: ExternalConnection[] }>('/sync/external-connections');
+  return response.data.connections;
+}
+
+export async function startEmailSyncOAuth(provider: ExternalConnection['provider'], returnTo: string) {
+  const response = await apiClient.post<{ authUrl: string }>(`/sync/oauth/${provider}/start`, undefined, {
+    params: { returnTo },
+  });
+  return response.data.authUrl;
 }
 
 export async function getEmailSyncRuns() {
   return mockEmailSyncRuns;
+}
+
+export async function getEmailImportRules(params?: EmailImportRuleListParams) {
+  const response = await apiClient.get<{ importRules: EmailImportRule[] }>('/sync/import-rules', { params });
+  return response.data.importRules;
+}
+
+export async function createEmailImportRule(payload: EmailImportRulePayload) {
+  const response = await apiClient.post<{ importRule: EmailImportRule }>('/sync/import-rules', payload);
+  return response.data.importRule;
+}
+
+export async function updateEmailImportRule(importRuleId: string, payload: Partial<EmailImportRulePayload> & { status?: 'active' | 'inactive' }) {
+  const response = await apiClient.patch<{ importRule: EmailImportRule }>(`/sync/import-rules/${importRuleId}`, payload);
+  return response.data.importRule;
+}
+
+export async function getImportedTransactions(params?: ImportedTransactionListParams) {
+  const response = await apiClient.get<PaginatedResponse<ImportedTransaction>>('/sync/imported-transactions', { params });
+  return response.data;
+}
+
+export async function updateImportedTransaction(importedTransactionId: string, payload: ImportedTransactionUpdatePayload) {
+  const response = await apiClient.patch<{ importedTransaction: ImportedTransaction }>(
+    `/sync/imported-transactions/${importedTransactionId}`,
+    payload,
+  );
+  return response.data.importedTransaction;
 }

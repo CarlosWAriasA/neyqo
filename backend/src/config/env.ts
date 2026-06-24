@@ -43,6 +43,17 @@ const envSchema = z.object({
   MAIL_DEV_LOG_CODES: z.enum(['true', 'false']).default('true'),
   FILE_LOGGING_ENABLED: z.enum(['true', 'false']).default('true'),
   LOG_DIR: z.string().optional().default('logs'),
+  TRUST_PROXY: z.enum(['true', 'false']).default('false'),
+  API_BODY_LIMIT_BYTES: z.coerce.number().int().min(16_384).max(1_048_576).default(262_144),
+  AUTH_LOGIN_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(120).default(10),
+  AUTH_WRITE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(120).default(20),
+  AUTH_CODE_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(120).default(8),
+  AUTH_REFRESH_RATE_LIMIT_MAX: z.coerce.number().int().min(1).max(300).default(60),
+  AUTH_RATE_LIMIT_WINDOW: z.string().default('1 minute'),
+  AUTH_LOCKOUT_MAX_ATTEMPTS: z.coerce.number().int().min(1).max(20).default(5),
+  AUTH_LOCKOUT_WINDOW_MINUTES: z.coerce.number().int().min(1).max(120).default(15),
+  AUTH_LOCKOUT_BASE_SECONDS: z.coerce.number().int().min(1).max(600).default(30),
+  EXCHANGE_RATES_API_BASE_URL: z.string().url().default('https://api.frankfurter.dev'),
 });
 
 const parsedEnv = envSchema.safeParse(process.env);
@@ -104,4 +115,51 @@ export const env = {
   mailDevLogCodes: rawEnv.MAIL_DEV_LOG_CODES === 'true',
   fileLoggingEnabled: rawEnv.FILE_LOGGING_ENABLED === 'true',
   logDir: rawEnv.LOG_DIR.trim() || 'logs',
+  trustProxy: rawEnv.TRUST_PROXY === 'true',
+  apiBodyLimitBytes: rawEnv.API_BODY_LIMIT_BYTES,
+  authLoginRateLimitMax: rawEnv.AUTH_LOGIN_RATE_LIMIT_MAX,
+  authWriteRateLimitMax: rawEnv.AUTH_WRITE_RATE_LIMIT_MAX,
+  authCodeRateLimitMax: rawEnv.AUTH_CODE_RATE_LIMIT_MAX,
+  authRefreshRateLimitMax: rawEnv.AUTH_REFRESH_RATE_LIMIT_MAX,
+  authRateLimitWindow: rawEnv.AUTH_RATE_LIMIT_WINDOW,
+  authLockoutMaxAttempts: rawEnv.AUTH_LOCKOUT_MAX_ATTEMPTS,
+  authLockoutWindowMinutes: rawEnv.AUTH_LOCKOUT_WINDOW_MINUTES,
+  authLockoutBaseSeconds: rawEnv.AUTH_LOCKOUT_BASE_SECONDS,
+  exchangeRatesApiBaseUrl: rawEnv.EXCHANGE_RATES_API_BASE_URL.replace(/\/+$/, ''),
 } as const;
+
+if (env.nodeEnv === 'production') {
+  const insecureConfigMessages: string[] = [];
+  const productionOrigins = env.allowedOrigins.filter((origin) => {
+    try {
+      const url = new URL(origin);
+      return ['localhost', '127.0.0.1', '::1'].includes(url.hostname);
+    } catch {
+      return origin === '*';
+    }
+  });
+
+  if (env.dbSynchronize) {
+    insecureConfigMessages.push('DB_SYNCHRONIZE debe ser false en producción.');
+  }
+
+  if (!env.cookieSecure) {
+    insecureConfigMessages.push('COOKIE_SECURE debe ser true en producción.');
+  }
+
+  if (productionOrigins.length > 0) {
+    insecureConfigMessages.push('ALLOWED_ORIGINS no debe incluir localhost, loopback ni comodines en producción.');
+  }
+
+  if (!env.internalServiceSecret) {
+    insecureConfigMessages.push('INTERNAL_SERVICE_SECRET debe estar configurado en producción.');
+  }
+
+  if (env.mailDevLogCodes) {
+    insecureConfigMessages.push('MAIL_DEV_LOG_CODES debe ser false en producción.');
+  }
+
+  if (insecureConfigMessages.length > 0) {
+    throw new Error(`Configuración insegura para producción:\n- ${insecureConfigMessages.join('\n- ')}`);
+  }
+}

@@ -35,6 +35,21 @@ export function TransactionPanel({
 }: TransactionPanelProps) {
   const amountInputRef = useRef<HTMLInputElement | null>(null);
   const amountField = form.register('amount');
+  const selectedSourceAccountId = form.watch('sourceAccountId');
+  const selectedDestinationAccountId = form.watch('destinationAccountId');
+  const selectedAmount = form.watch('amount');
+  const selectedDestinationAmount = form.watch('destinationAmount');
+  const sourceAccount = activeAccounts.find((account) => account.id === selectedSourceAccountId);
+  const destinationAccount = activeAccounts.find((account) => account.id === selectedDestinationAccountId);
+  const isCrossCurrencyTransfer = Boolean(
+    selectedType === 'transfer' &&
+    sourceAccount &&
+    destinationAccount &&
+    sourceAccount.currency !== destinationAccount.currency,
+  );
+  const impliedRate = isCrossCurrencyTransfer && Number(selectedAmount) > 0 && Number(selectedDestinationAmount) > 0
+    ? Number(selectedDestinationAmount) / Number(selectedAmount)
+    : null;
 
   useEffect(() => {
     if (selectedTransaction) {
@@ -49,10 +64,17 @@ export function TransactionPanel({
     return () => window.clearTimeout(focusTimer);
   }, [selectedTransaction]);
 
+  useEffect(() => {
+    if (!isCrossCurrencyTransfer) {
+      form.setValue('destinationAmount', undefined);
+    }
+  }, [form, isCrossCurrencyTransfer]);
+
   function handleTypeChange(type: Transaction['type']) {
     form.setValue('type', type, { shouldDirty: true, shouldValidate: true });
     form.setValue('categoryId', '', { shouldDirty: true });
     form.setValue('destinationAccountId', '', { shouldDirty: true });
+    form.setValue('destinationAmount', undefined, { shouldDirty: true });
   }
 
   return (
@@ -139,6 +161,33 @@ export function TransactionPanel({
               </Field>
             )}
           </div>
+
+          {selectedType === 'transfer' && sourceAccount && destinationAccount ? (
+            <div className="rounded-panel border border-border bg-muted/30 p-4">
+              {isCrossCurrencyTransfer ? (
+                <div className="grid gap-4 md:grid-cols-[1fr_1fr]">
+                  <Field
+                    label={`Monto recibido (${destinationAccount.currency})`}
+                    error={form.formState.errors.destinationAmount?.message}
+                  >
+                    <Input type="number" min="0" step="0.01" {...form.register('destinationAmount')} />
+                  </Field>
+                  <div className="rounded-panel bg-surface p-4">
+                    <p className="text-sm font-medium text-text">Tasa usada</p>
+                    <p className="mt-1 text-sm leading-6 text-subtle">
+                      {impliedRate
+                        ? `1 ${sourceAccount.currency} = ${impliedRate.toFixed(6)} ${destinationAccount.currency}`
+                        : 'Completa ambos montos.'}
+                    </p>
+                  </div>
+                </div>
+              ) : (
+                <p className="text-sm font-medium text-subtle">
+                  Transferencia en {sourceAccount.currency}. El monto enviado y recibido es el mismo.
+                </p>
+              )}
+            </div>
+          ) : null}
 
           <div className="grid gap-4 md:grid-cols-2">
             <Field label="Descripción" error={form.formState.errors.description?.message}>

@@ -14,6 +14,33 @@ export interface InternalTransactionPayload {
   processedAt?: string;
 }
 
+export interface InternalImportedTransactionPayload {
+  userId: string;
+  provider: 'gmail' | 'outlook';
+  externalMessageId: string;
+  bankCode:
+    | 'popular'
+    | 'qik'
+    | 'santa_cruz'
+    | 'banesco'
+    | 'asociacion_popular'
+    | 'lafise'
+    | 'bhd'
+    | 'banreservas'
+    | 'bdi'
+    | 'unknown';
+  eventType: 'purchase' | 'reversal' | 'payment' | 'withdrawal' | 'deposit' | 'transfer' | 'unknown';
+  providerStatus: 'approved' | 'declined' | 'pending' | 'unknown';
+  productName?: string;
+  cardLastDigits?: string;
+  merchant: string;
+  amount: number;
+  currency: 'DOP' | 'USD' | 'EUR';
+  transactionDate: string;
+  rawDescription: string;
+  confidence: number;
+}
+
 export class NeyqoApiError extends Error {
   constructor(
     public readonly statusCode: number,
@@ -62,6 +89,42 @@ export class NeyqoApiClient {
     return {
       transactionId,
       duplicate: responseBody.duplicate === true,
+    };
+  }
+
+  async createInternalImportedTransaction(
+    payload: InternalImportedTransactionPayload,
+  ): Promise<{ importedTransactionId: string; duplicate: boolean; matchedRuleId?: string }> {
+    const response = await fetch(`${this.baseUrl}/internal/email-sync/imported-transactions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Internal-Service-Secret': this.internalServiceSecret,
+      },
+      body: JSON.stringify(payload),
+    });
+
+    const responseBody = (await response.json().catch(() => ({}))) as {
+      message?: string;
+      duplicate?: boolean;
+      matchedRuleId?: string;
+      importedTransaction?: { id?: string };
+    };
+
+    if (!response.ok) {
+      throw new NeyqoApiError(response.status, responseBody.message ?? 'La API de Neyqo rechazó la detección interna.');
+    }
+
+    const importedTransactionId = responseBody.importedTransaction?.id;
+
+    if (!importedTransactionId) {
+      throw new NeyqoApiError(502, 'La API de Neyqo no devolvió la transacción detectada.');
+    }
+
+    return {
+      importedTransactionId,
+      duplicate: responseBody.duplicate === true,
+      matchedRuleId: responseBody.matchedRuleId,
     };
   }
 

@@ -30,6 +30,11 @@ export function TransactionRow({ transaction, isDeleting, onEdit, onDelete }: Tr
       <td className="px-5 py-4 text-subtle">{formatDate(transaction.date)}</td>
       <td className="px-5 py-4 text-right font-semibold text-text">
         {formatCurrency(transaction.amount, transaction.currency)}
+        {transaction.type === 'transfer' && transaction.destinationAmount && transaction.destinationCurrency ? (
+          <span className="mt-1 block text-xs font-medium text-subtle">
+            Recibe {formatCurrency(transaction.destinationAmount, transaction.destinationCurrency)}
+          </span>
+        ) : null}
       </td>
       <td className="px-5 py-4">
         <div className="flex justify-end gap-2">

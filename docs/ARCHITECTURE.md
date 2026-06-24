@@ -33,6 +33,10 @@ The backend uses Fastify, TypeORM, PostgreSQL, Zod, JWT access tokens, and an HT
 
 Financial modules should be added as isolated modules under `backend/src/modules`, with entities under `backend/src/entities` and DTO validation through Zod.
 
+Financial routes use shared route helpers for authentication, Zod validation error responses, and protected internal-service secrets. Modules should keep HTTP concerns in `*.routes.ts`, request contracts in `*.schemas.ts`, business rules in `*.service.ts`, and add `*.repository.ts` only when query or persistence logic becomes non-trivial.
+
+Transaction balance changes are centralized in the transactions balance service so manual transactions, scheduled transactions, and future imported transactions apply the same accounting rules.
+
 ## Worker Boundary
 
 `neyqo-worker` runs periodic jobs independently from the API process. It can read and update operational tables such as `scheduled_transactions`, `worker_job_runs`, `worker_job_errors`, and `email_synced_messages`.
@@ -67,6 +71,8 @@ Current fields:
 - `src/theme`: persisted light/dark/system theme handling.
 - `src/types`: auth and finance contracts.
 
+TanStack Query hooks for finance data live under `src/features/finance` and are grouped by domain. `src/features/finance/hooks.ts` remains the compatibility export surface for route modules.
+
 ## Routes
 
 Public routes are `/`, `/login`, `/register`, `/forgot-password`, `/reset-password`, `/privacy`, and `/terms`.
@@ -89,8 +95,17 @@ Backend errors are written as JSON Lines when `FILE_LOGGING_ENABLED=true`:
 
 - `backend/logs/errors.log` for unhandled API errors and startup failures.
 - `backend/logs/app.log` for lifecycle events such as backend startup.
+- `backend/logs/security.log` for authentication failures, rate-limit events, blocked origins, and other security events.
 
 The log directory can be changed with `LOG_DIR`.
+
+## Security Baseline
+
+The backend applies Helmet, strict CORS allowlisting, global rate limits, PostgreSQL-backed authentication throttles, API `no-store` cache headers, bounded JSON body size, OAuth state-cookie validation, and progressive abuse controls for authentication and one-time-code flows.
+
+Production startup fails when security-critical settings are unsafe, including `DB_SYNCHRONIZE=true`, insecure cookies, localhost/wildcard origins, missing `INTERNAL_SERVICE_SECRET`, or dev code logging. If Neyqo runs behind a trusted proxy such as a managed platform/load balancer, set `TRUST_PROXY=true` so IP-based rate limits use the client IP.
+
+Authentication throttle buckets are stored in `auth_throttle_buckets` so bot controls are shared across backend instances. Expired buckets can be periodically cleaned with the auth abuse protection cleanup method or a database maintenance job.
 
 ## Mock Data Strategy
 
@@ -125,3 +140,5 @@ The first mobile screen is a full-screen carousel-style landing page with login 
 Authentication OAuth is separate from email sync OAuth. Google or Microsoft login must use identity scopes only. Gmail or Outlook mail-reading permissions belong to `/app/sync` and future sync-specific backend endpoints.
 
 Email sync worker contracts exist in `neyqo-worker/src/jobs/email-sync`, but provider token storage and bank email parsing remain pending. External provider tokens must be encrypted and must never be logged.
+
+Email transaction parsing is strategy-based. Provider-specific or bank-specific parsers should implement the parser strategy interface and should return parsed metadata only, not full email bodies.

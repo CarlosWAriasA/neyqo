@@ -30,7 +30,7 @@ export function BudgetOverviewCard({ summary, warningBudgets, loading = false, o
       {loading ? (
         <>
           <Skeleton className="h-2 w-full" />
-          <Skeleton className="mt-3 h-4 w-48" />
+          <Skeleton className="mt-3 h-4 w-4/5 max-w-48" />
           <div className="mt-5 grid gap-4">
             {Array.from({ length: 3 }).map((_, index) => (
               <Skeleton key={index} className="h-[4.25rem]" />

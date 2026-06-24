@@ -3,9 +3,20 @@ import { createHash, randomInt } from 'crypto';
 import type { FastifyReply } from 'fastify';
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
-import type { Repository } from 'typeorm';
+import type { DataSource, Repository } from 'typeorm';
 import { env } from '../../config/env';
+import { Account } from '../../entities/account.entity';
 import { AuthIdentity } from '../../entities/auth-identity.entity';
+import { Budget } from '../../entities/budget.entity';
+import { BudgetPeriodRecord } from '../../entities/budget-period.entity';
+import { Category } from '../../entities/category.entity';
+import { EmailImportRule } from '../../entities/email-import-rule.entity';
+import { EmailSyncedMessage } from '../../entities/email-synced-message.entity';
+import { ExternalConnection } from '../../entities/external-connection.entity';
+import { ImportedTransaction } from '../../entities/imported-transaction.entity';
+import { ScheduledTransaction } from '../../entities/scheduled-transaction.entity';
+import { Transaction } from '../../entities/transaction.entity';
+import { UserPreference } from '../../entities/user-preference.entity';
 import type { AuthProvider } from '../../entities/user.entity';
 import { User } from '../../entities/user.entity';
 import type { AccountsService } from '../accounts/accounts.service';
@@ -20,6 +31,7 @@ import type {
   LoginInput,
   RegisterInput,
   ResendVerificationCodeInput,
+  DeleteAccountInput,
   ResetPasswordInput,
   VerifyEmailInput,
 } from './auth.schemas';
@@ -57,6 +69,7 @@ export interface PublicUser {
   emailVerified: boolean;
   hasPasswordAccess: boolean;
   hasGoogleAccess: boolean;
+  hasMicrosoftAccess: boolean;
   avatarUrl?: string;
   initialDataNoticeShown: boolean;
   createdAt: string;
@@ -93,6 +106,7 @@ const socialAccountEmailConflictMessage =
 
 export class AuthService {
   constructor(
+    private readonly dataSource: DataSource,
     private readonly usersRepository: Repository<User>,
     private readonly authEmailService: AuthEmailService,
     private readonly authIdentityRepository: Repository<AuthIdentity>,
@@ -476,6 +490,48 @@ export class AuthService {
     this.clearRefreshCookie(reply);
   }
 
+  async deleteOwnAccount(
+    accessToken: string | undefined,
+    payload: DeleteAccountInput,
+    reply: FastifyReply,
+  ): Promise<{ userId: string }> {
+    if (payload.confirmationText !== 'ELIMINAR MI CUENTA' || payload.acceptedIrreversibleDeletion !== true) {
+      throw new AuthError(400, 'Confirmación de eliminación inválida.');
+    }
+
+    const sessionUser = await this.getCurrentUser(accessToken);
+    const user = await this.findById(sessionUser.id);
+
+    if (!user) {
+      throw new AuthError(401, 'El usuario de la sesión no existe.');
+    }
+
+    await this.dataSource.transaction(async (manager) => {
+      await manager.delete(EmailSyncedMessage, { userId: user.id });
+      await manager.delete(ImportedTransaction, { userId: user.id });
+      await manager.delete(EmailImportRule, { userId: user.id });
+      await manager.delete(ExternalConnection, { userId: user.id });
+      await manager.delete(BudgetPeriodRecord, { userId: user.id });
+      await manager
+        .createQueryBuilder()
+        .delete()
+        .from('budget_categories')
+        .where('budget_id IN (SELECT id FROM budgets WHERE user_id = :userId)', { userId: user.id })
+        .execute();
+      await manager.delete(Budget, { userId: user.id });
+      await manager.delete(Transaction, { userId: user.id });
+      await manager.delete(ScheduledTransaction, { userId: user.id });
+      await manager.delete(Account, { userId: user.id });
+      await manager.delete(Category, { userId: user.id });
+      await manager.delete(UserPreference, { userId: user.id });
+      await manager.delete(AuthIdentity, { userId: user.id });
+      await manager.delete(User, { id: user.id });
+    });
+
+    this.clearRefreshCookie(reply);
+    return { userId: user.id };
+  }
+
   private async createSession(user: User, reply: FastifyReply): Promise<AuthSessionResponse> {
     const accessTokenExpiresIn = env.jwtAccessExpiresIn as SignOptions['expiresIn'];
     const refreshTokenExpiresIn = env.jwtRefreshExpiresIn as SignOptions['expiresIn'];
@@ -786,6 +842,7 @@ export class AuthService {
       emailVerified: user.emailVerified,
       hasPasswordAccess: this.userCanLoginWithPassword(user),
       hasGoogleAccess: providers.includes('google'),
+      hasMicrosoftAccess: providers.includes('microsoft'),
       avatarUrl: user.avatarUrl ?? undefined,
       initialDataNoticeShown: user.initialDataNoticeShown,
       createdAt: user.createdAt.toISOString(),
