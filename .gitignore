@@ -5,6 +5,13 @@ logs/
 .env.local
 .DS_Store
 npm-debug.log*
+*-dev.log
+*-dev.err.log
+
+# Local agent artifacts
+.agents/
+skills-lock.json
+docs/superpowers/plans/
 
 # Android / Gradle
 .gradle/
