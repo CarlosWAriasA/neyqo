@@ -7,6 +7,8 @@ export const userPreferencesSchema = z.object({
   theme: z.enum(['light', 'dark', 'system']),
   hideBalances: z.boolean(),
   budgetAlerts: z.boolean(),
+  scheduledPaymentReminders: z.boolean(),
+  unusualSpendingAlerts: z.boolean(),
 });
 
 export const updateUserPreferencesSchema = userPreferencesSchema.partial().refine(

@@ -9,6 +9,8 @@ export function toUserPreferences(preferences: UserPreferences): UserPreferences
     theme: preferences.theme,
     hideBalances: preferences.hideBalances,
     budgetAlerts: preferences.budgetAlerts,
+    scheduledPaymentReminders: preferences.scheduledPaymentReminders,
+    unusualSpendingAlerts: preferences.unusualSpendingAlerts,
   };
 }
 

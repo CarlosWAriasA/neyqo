@@ -11,6 +11,8 @@ export interface UserPreferences {
   theme: ThemePreference;
   hideBalances: boolean;
   budgetAlerts: boolean;
+  scheduledPaymentReminders: boolean;
+  unusualSpendingAlerts: boolean;
 }
 
 export const userPreferencesStorageKey = 'neyqo.preferences';
@@ -22,6 +24,8 @@ export const defaultUserPreferences: UserPreferences = {
   theme: 'system',
   hideBalances: false,
   budgetAlerts: true,
+  scheduledPaymentReminders: true,
+  unusualSpendingAlerts: true,
 };
 
 export function getStoredUserPreferences(): UserPreferences {
@@ -41,6 +45,8 @@ export function getStoredUserPreferences(): UserPreferences {
       theme: isTheme(parsed.theme) ? parsed.theme : 'system',
       hideBalances: Boolean(parsed.hideBalances),
       budgetAlerts: parsed.budgetAlerts !== false,
+      scheduledPaymentReminders: parsed.scheduledPaymentReminders !== false,
+      unusualSpendingAlerts: parsed.unusualSpendingAlerts !== false,
     };
   } catch {
     return defaultUserPreferences;

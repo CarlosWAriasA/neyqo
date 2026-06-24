@@ -20,6 +20,10 @@ This backend is a copied and isolated version of `generic-login/backend`.
 - `POST /api/auth/password/reset`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
+- `GET /api/auth/sessions`
+- `DELETE /api/auth/sessions/:sessionId`
+- `POST /api/auth/sessions/revoke-others`
+- `POST /api/auth/sessions/revoke-all`
 - `DELETE /api/auth/account`
 - `GET /api/auth/me`
 - `GET /api/auth/oauth/google/start` placeholder

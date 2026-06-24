@@ -1,5 +1,5 @@
 import { apiClient, authStorage, clearSilentRefresh, scheduleSilentRefresh } from './client';
-import type { AuthSession, AuthUser } from '../types/auth';
+import type { AuthSession, AuthSessionDevice, AuthUser } from '../types/auth';
 import { queryClient } from '../app/providers/queryClient';
 
 export interface LoginPayload {
@@ -74,6 +74,43 @@ export async function initializeUserData() {
 export async function logout() {
   try {
     await apiClient.post('/auth/logout');
+  } finally {
+    clearSilentRefresh();
+    authStorage.clear();
+    queryClient.clear();
+    localStorage.removeItem('neyqo.oauth-result');
+  }
+}
+
+export async function getAuthSessions() {
+  const { data } = await apiClient.get<{ sessions: AuthSessionDevice[] }>('/auth/sessions');
+  return data.sessions;
+}
+
+export async function revokeAuthSession(sessionId: string) {
+  const { data } = await apiClient.delete<{ revokedCurrentSession: boolean }>(
+    `/auth/sessions/${sessionId}`,
+  );
+
+  if (data.revokedCurrentSession) {
+    clearSilentRefresh();
+    authStorage.clear();
+    queryClient.clear();
+    localStorage.removeItem('neyqo.oauth-result');
+  }
+
+  return data;
+}
+
+export async function revokeOtherAuthSessions() {
+  const { data } = await apiClient.post<{ revokedCount: number }>('/auth/sessions/revoke-others');
+  return data;
+}
+
+export async function revokeAllAuthSessions() {
+  try {
+    const { data } = await apiClient.post<{ revokedCount: number }>('/auth/sessions/revoke-all');
+    return data;
   } finally {
     clearSilentRefresh();
     authStorage.clear();

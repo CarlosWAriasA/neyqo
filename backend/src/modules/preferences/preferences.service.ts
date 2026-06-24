@@ -13,6 +13,8 @@ const defaultPreferences: UserPreferencesInput = {
   theme: 'system',
   hideBalances: false,
   budgetAlerts: true,
+  scheduledPaymentReminders: true,
+  unusualSpendingAlerts: true,
 };
 
 export class PreferencesService {
@@ -78,6 +80,8 @@ export class PreferencesService {
       theme: preferences.theme,
       hideBalances: preferences.hideBalances,
       budgetAlerts: preferences.budgetAlerts,
+      scheduledPaymentReminders: preferences.scheduledPaymentReminders,
+      unusualSpendingAlerts: preferences.unusualSpendingAlerts,
       updatedAt: preferences.updatedAt.toISOString(),
     };
   }

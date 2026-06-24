@@ -1,12 +1,13 @@
 import bcrypt from 'bcryptjs';
 import { createHash, randomInt } from 'crypto';
-import type { FastifyReply } from 'fastify';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
-import type { DataSource, Repository } from 'typeorm';
+import { IsNull, type DataSource, type Repository } from 'typeorm';
 import { env } from '../../config/env';
 import { Account } from '../../entities/account.entity';
 import { AuthIdentity } from '../../entities/auth-identity.entity';
+import { AuthSession } from '../../entities/auth-session.entity';
 import { Budget } from '../../entities/budget.entity';
 import { BudgetPeriodRecord } from '../../entities/budget-period.entity';
 import { Category } from '../../entities/category.entity';
@@ -38,12 +39,14 @@ import type {
 
 interface AccessTokenPayload extends jwt.JwtPayload {
   sub: string;
+  sid?: string;
   email: string;
   type: 'access';
 }
 
 interface RefreshTokenPayload extends jwt.JwtPayload {
   sub: string;
+  sid?: string;
   type: 'refresh';
 }
 
@@ -85,6 +88,16 @@ export interface AuthSessionResponse {
 export interface AuthActionResponse {
   message: string;
   email?: string;
+}
+
+export interface AuthSessionDevice {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  current: boolean;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
 }
 
 export class AuthError extends Error {
@@ -175,6 +188,7 @@ export class AuthService {
   async verifyEmail(
     payload: VerifyEmailInput,
     reply: FastifyReply,
+    request?: FastifyRequest,
   ): Promise<AuthSessionResponse> {
     const user = await this.findByEmailWithVerificationCode(payload.email);
 
@@ -217,7 +231,7 @@ export class AuthService {
       fullName: verifiedUser.fullName,
     });
 
-    return this.createSession(verifiedUser, reply);
+    return this.createSession(verifiedUser, reply, request);
   }
 
   async resendEmailVerificationCode(
@@ -235,7 +249,11 @@ export class AuthService {
     };
   }
 
-  async login(payload: LoginInput, reply: FastifyReply): Promise<AuthSessionResponse> {
+  async login(
+    payload: LoginInput,
+    reply: FastifyReply,
+    request?: FastifyRequest,
+  ): Promise<AuthSessionResponse> {
     const user = await this.findByEmailWithPassword(payload.email);
 
     if (!user || !this.userCanLoginWithPassword(user)) {
@@ -258,12 +276,13 @@ export class AuthService {
       throw new AuthError(401, 'Correo o contraseña incorrectos.');
     }
 
-    return this.createSession(user, reply);
+    return this.createSession(user, reply, request);
   }
 
   async loginWithGoogle(
     payload: GoogleLoginInput,
     reply: FastifyReply,
+    request?: FastifyRequest,
   ): Promise<AuthSessionResponse> {
     if (!env.googleClientId) {
       throw new AuthError(500, 'Google no está configurado en el backend.');
@@ -298,7 +317,7 @@ export class AuthService {
         throw new Error('No fue posible recuperar la cuenta vinculada con Google.');
       }
 
-      return this.createSession(savedUser, reply);
+      return this.createSession(savedUser, reply, request);
     }
 
     const existingByEmail = await this.findByEmail(googleProfile.email);
@@ -337,7 +356,7 @@ export class AuthService {
       fullName: savedUser.fullName,
     });
 
-    return this.createSession(savedUser, reply);
+    return this.createSession(savedUser, reply, request);
   }
 
   async requestPasswordReset(payload: ForgotPasswordInput): Promise<AuthActionResponse> {
@@ -402,30 +421,60 @@ export class AuthService {
   async refreshSession(
     refreshToken: string | undefined,
     reply: FastifyReply,
+    request?: FastifyRequest,
   ): Promise<AuthSessionResponse> {
     if (!refreshToken) {
       throw new AuthError(401, 'No hay refresh token disponible.');
     }
 
     const payload = this.verifyRefreshToken(refreshToken);
-    const user = await this.findByIdWithRefreshToken(payload.sub);
 
-    if (!user || !user.refreshTokenHash) {
+    if (!payload.sid) {
+      const legacyUser = await this.findByIdWithRefreshToken(payload.sub);
+
+      if (!legacyUser || !legacyUser.refreshTokenHash) {
+        throw new AuthError(401, 'La sesión ya no es válida.');
+      }
+
+      if (legacyUser.refreshTokenExpiresAt && legacyUser.refreshTokenExpiresAt.getTime() < Date.now()) {
+        await this.clearPersistedRefreshToken(legacyUser.id);
+        throw new AuthError(401, 'El refresh token expiró.');
+      }
+
+      const legacyRefreshTokenMatches = await bcrypt.compare(refreshToken, legacyUser.refreshTokenHash);
+
+      if (!legacyRefreshTokenMatches) {
+        throw new AuthError(401, 'La sesión ya no es válida.');
+      }
+
+      await this.clearPersistedRefreshToken(legacyUser.id);
+      return this.createSession(legacyUser, reply, request);
+    }
+
+    const session = payload.sid ? await this.findSessionWithRefreshToken(payload.sid, payload.sub) : null;
+
+    if (!session || session.revokedAt) {
       throw new AuthError(401, 'La sesión ya no es válida.');
     }
 
-    if (user.refreshTokenExpiresAt && user.refreshTokenExpiresAt.getTime() < Date.now()) {
-      await this.clearPersistedRefreshToken(user.id);
+    if (session.expiresAt.getTime() < Date.now()) {
+      await this.revokePersistedSession(session.id, payload.sub);
       throw new AuthError(401, 'El refresh token expiró.');
     }
 
-    const refreshTokenMatches = await bcrypt.compare(refreshToken, user.refreshTokenHash);
+    const refreshTokenMatches = await bcrypt.compare(refreshToken, session.refreshTokenHash);
 
     if (!refreshTokenMatches) {
       throw new AuthError(401, 'La sesión ya no es válida.');
     }
 
-    return this.createSession(user, reply);
+    const user = await this.findById(payload.sub);
+
+    if (!user) {
+      throw new AuthError(401, 'El usuario de la sesión no existe.');
+    }
+
+    return this.rotateSession(user, session, reply, request);
   }
 
   async getCurrentUser(accessToken: string | undefined): Promise<PublicUser> {
@@ -481,13 +530,117 @@ export class AuthService {
     if (refreshToken) {
       try {
         const payload = this.verifyRefreshToken(refreshToken);
-        await this.clearPersistedRefreshToken(payload.sub);
+        if (payload.sid) {
+          await this.revokePersistedSession(payload.sid, payload.sub);
+        } else {
+          await this.clearPersistedRefreshToken(payload.sub);
+        }
       } catch {
         // Si el token ya no es válido, igualmente limpiamos la cookie.
       }
     }
 
     this.clearRefreshCookie(reply);
+  }
+
+  async listSessions(accessToken: string | undefined): Promise<{ sessions: AuthSessionDevice[] }> {
+    const payload = this.verifyRequiredAccessToken(accessToken);
+    const sessions = await this.dataSource.getRepository(AuthSession).find({
+      where: {
+        userId: payload.sub,
+        revokedAt: IsNull(),
+      },
+      order: {
+        lastUsedAt: 'DESC',
+      },
+    });
+    const now = Date.now();
+
+    return {
+      sessions: sessions
+        .filter((session) => session.expiresAt.getTime() > now)
+        .map((session) => this.toSessionDevice(session, payload.sid)),
+    };
+  }
+
+  async revokeSession(
+    accessToken: string | undefined,
+    refreshToken: string | undefined,
+    sessionId: string,
+    reply: FastifyReply,
+  ): Promise<{ revokedCurrentSession: boolean }> {
+    const payload = this.verifyRequiredAccessToken(accessToken);
+    const session = await this.dataSource.getRepository(AuthSession).findOne({
+      where: {
+        id: sessionId,
+        userId: payload.sub,
+      },
+    });
+
+    if (!session) {
+      throw new AuthError(404, 'No encontramos esa sesión.');
+    }
+
+    await this.revokePersistedSession(session.id, payload.sub);
+    const revokedCurrentSession = session.id === payload.sid || this.refreshTokenBelongsToSession(refreshToken, session.id);
+
+    if (revokedCurrentSession) {
+      this.clearRefreshCookie(reply);
+    }
+
+    return { revokedCurrentSession };
+  }
+
+  async revokeOtherSessions(
+    accessToken: string | undefined,
+    reply: FastifyReply,
+  ): Promise<{ revokedCount: number }> {
+    const payload = this.verifyRequiredAccessToken(accessToken);
+
+    if (!payload.sid) {
+      const result = await this.dataSource.getRepository(AuthSession).update(
+        {
+          userId: payload.sub,
+          revokedAt: IsNull(),
+        },
+        {
+          revokedAt: new Date(),
+        },
+      );
+      this.clearRefreshCookie(reply);
+      return { revokedCount: result.affected ?? 0 };
+    }
+
+    const result = await this.dataSource
+      .getRepository(AuthSession)
+      .createQueryBuilder()
+      .update(AuthSession)
+      .set({ revokedAt: new Date() })
+      .where('user_id = :userId', { userId: payload.sub })
+      .andWhere('id != :sessionId', { sessionId: payload.sid })
+      .andWhere('revoked_at IS NULL')
+      .execute();
+
+    return { revokedCount: result.affected ?? 0 };
+  }
+
+  async revokeAllSessions(
+    accessToken: string | undefined,
+    reply: FastifyReply,
+  ): Promise<{ revokedCount: number }> {
+    const payload = this.verifyRequiredAccessToken(accessToken);
+    const result = await this.dataSource.getRepository(AuthSession).update(
+      {
+        userId: payload.sub,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+
+    this.clearRefreshCookie(reply);
+    return { revokedCount: result.affected ?? 0 };
   }
 
   async deleteOwnAccount(
@@ -532,13 +685,32 @@ export class AuthService {
     return { userId: user.id };
   }
 
-  private async createSession(user: User, reply: FastifyReply): Promise<AuthSessionResponse> {
+  private async createSession(
+    user: User,
+    reply: FastifyReply,
+    request?: FastifyRequest,
+  ): Promise<AuthSessionResponse> {
     const accessTokenExpiresIn = env.jwtAccessExpiresIn as SignOptions['expiresIn'];
     const refreshTokenExpiresIn = env.jwtRefreshExpiresIn as SignOptions['expiresIn'];
+    const refreshTokenExpiresAt = this.resolveFutureDate(env.jwtRefreshExpiresIn);
+    const sessionRepository = this.dataSource.getRepository(AuthSession);
+    const now = new Date();
+    const session = await sessionRepository.save(
+      sessionRepository.create({
+        userId: user.id,
+        refreshTokenHash: 'pending',
+        userAgent: this.getUserAgent(request),
+        ipAddress: this.getRequestIp(request),
+        lastUsedAt: now,
+        expiresAt: refreshTokenExpiresAt,
+        revokedAt: null,
+      }),
+    );
 
     const accessToken = jwt.sign(
       {
         sub: user.id,
+        sid: session.id,
         email: user.email,
         type: 'access',
       } satisfies AccessTokenPayload,
@@ -551,6 +723,7 @@ export class AuthService {
     const refreshToken = jwt.sign(
       {
         sub: user.id,
+        sid: session.id,
         type: 'refresh',
       } satisfies RefreshTokenPayload,
       env.jwtRefreshSecret,
@@ -559,24 +732,81 @@ export class AuthService {
       },
     );
 
-    const refreshTokenExpiresAt = this.resolveFutureDate(env.jwtRefreshExpiresIn);
     const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
 
-    await this.usersRepository.update(
-      {
-        id: user.id,
-      },
-      {
-        refreshTokenHash,
-        refreshTokenExpiresAt,
-        lastLoginAt: new Date(),
-      },
-    );
+    await sessionRepository.update({ id: session.id }, { refreshTokenHash });
+    await this.usersRepository.update({ id: user.id }, { lastLoginAt: now });
 
     const persistedUser = await this.findById(user.id);
 
     if (!persistedUser) {
       throw new Error('No fue posible recuperar el usuario tras crear la sesión.');
+    }
+
+    this.setRefreshCookie(reply, refreshToken, refreshTokenExpiresAt);
+
+    return {
+      user: this.toPublicUser(persistedUser),
+      accessToken,
+      tokenType: 'Bearer',
+      expiresIn: env.jwtAccessExpiresIn,
+    };
+  }
+
+  private async rotateSession(
+    user: User,
+    session: AuthSession,
+    reply: FastifyReply,
+    request?: FastifyRequest,
+  ): Promise<AuthSessionResponse> {
+    const accessTokenExpiresIn = env.jwtAccessExpiresIn as SignOptions['expiresIn'];
+    const refreshTokenExpiresIn = env.jwtRefreshExpiresIn as SignOptions['expiresIn'];
+    const refreshTokenExpiresAt = this.resolveFutureDate(env.jwtRefreshExpiresIn);
+    const now = new Date();
+
+    const accessToken = jwt.sign(
+      {
+        sub: user.id,
+        sid: session.id,
+        email: user.email,
+        type: 'access',
+      } satisfies AccessTokenPayload,
+      env.jwtAccessSecret,
+      {
+        expiresIn: accessTokenExpiresIn,
+      },
+    );
+
+    const refreshToken = jwt.sign(
+      {
+        sub: user.id,
+        sid: session.id,
+        type: 'refresh',
+      } satisfies RefreshTokenPayload,
+      env.jwtRefreshSecret,
+      {
+        expiresIn: refreshTokenExpiresIn,
+      },
+    );
+
+    await this.dataSource.getRepository(AuthSession).update(
+      {
+        id: session.id,
+      },
+      {
+        refreshTokenHash: await bcrypt.hash(refreshToken, 12),
+        userAgent: this.getUserAgent(request) ?? session.userAgent,
+        ipAddress: this.getRequestIp(request) ?? session.ipAddress,
+        lastUsedAt: now,
+        expiresAt: refreshTokenExpiresAt,
+      },
+    );
+    await this.usersRepository.update({ id: user.id }, { lastLoginAt: now });
+
+    const persistedUser = await this.findById(user.id);
+
+    if (!persistedUser) {
+      throw new Error('No fue posible recuperar el usuario tras refrescar la sesión.');
     }
 
     this.setRefreshCookie(reply, refreshToken, refreshTokenExpiresAt);
@@ -629,6 +859,14 @@ export class AuthService {
     } catch {
       throw new AuthError(401, 'El access token no es válido.');
     }
+  }
+
+  private verifyRequiredAccessToken(token: string | undefined): AccessTokenPayload {
+    if (!token) {
+      throw new AuthError(401, 'Falta el access token.');
+    }
+
+    return this.verifyAccessToken(token);
   }
 
   private verifyRefreshToken(token: string): RefreshTokenPayload {
@@ -755,6 +993,82 @@ export class AuthService {
         refreshTokenExpiresAt: null,
       },
     );
+    await this.dataSource.getRepository(AuthSession).update(
+      {
+        userId,
+        revokedAt: IsNull(),
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+  }
+
+  private async findSessionWithRefreshToken(
+    sessionId: string,
+    userId: string,
+  ): Promise<AuthSession | null> {
+    return this.dataSource
+      .getRepository(AuthSession)
+      .createQueryBuilder('session')
+      .addSelect('session.refreshTokenHash')
+      .where('session.id = :sessionId', { sessionId })
+      .andWhere('session.userId = :userId', { userId })
+      .getOne();
+  }
+
+  private async revokePersistedSession(sessionId: string, userId: string): Promise<void> {
+    await this.dataSource.getRepository(AuthSession).update(
+      {
+        id: sessionId,
+        userId,
+      },
+      {
+        revokedAt: new Date(),
+      },
+    );
+  }
+
+  private refreshTokenBelongsToSession(
+    refreshToken: string | undefined,
+    sessionId: string,
+  ): boolean {
+    if (!refreshToken) {
+      return false;
+    }
+
+    try {
+      return this.verifyRefreshToken(refreshToken).sid === sessionId;
+    } catch {
+      return false;
+    }
+  }
+
+  private toSessionDevice(session: AuthSession, currentSessionId: string | undefined): AuthSessionDevice {
+    return {
+      id: session.id,
+      userAgent: session.userAgent,
+      ipAddress: session.ipAddress,
+      current: session.id === currentSessionId,
+      createdAt: session.createdAt.toISOString(),
+      lastUsedAt: session.lastUsedAt.toISOString(),
+      expiresAt: session.expiresAt.toISOString(),
+    };
+  }
+
+  private getUserAgent(request: FastifyRequest | undefined): string | null {
+    const userAgent = request?.headers['user-agent'];
+    const value = Array.isArray(userAgent) ? userAgent[0] : userAgent;
+
+    if (!value) {
+      return null;
+    }
+
+    return value.slice(0, 500);
+  }
+
+  private getRequestIp(request: FastifyRequest | undefined): string | null {
+    return request?.ip?.slice(0, 80) ?? null;
   }
 
   private async discardPendingRegistration(userId: string): Promise<void> {
@@ -1073,6 +1387,7 @@ export class AuthService {
   async loginWithMicrosoft(
     profile: MicrosoftUserProfile,
     reply: FastifyReply,
+    request?: FastifyRequest,
   ): Promise<AuthSessionResponse> {
     if (!env.microsoftClientId) {
       throw new AuthError(500, 'Microsoft no está configurado en el backend.');
@@ -1104,7 +1419,7 @@ export class AuthService {
         throw new Error('No fue posible recuperar la cuenta vinculada con Microsoft.');
       }
 
-      return this.createSession(savedUser, reply);
+      return this.createSession(savedUser, reply, request);
     }
 
     const existingByEmail = await this.findByEmail(profile.email);
@@ -1143,6 +1458,6 @@ export class AuthService {
       fullName: savedUser.fullName,
     });
 
-    return this.createSession(savedUser, reply);
+    return this.createSession(savedUser, reply, request);
   }
 }

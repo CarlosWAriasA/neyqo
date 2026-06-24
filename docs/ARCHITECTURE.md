@@ -27,6 +27,11 @@ On startup protected routes:
 5. Redirect unauthenticated users from `/app/*` to `/login`.
 6. Calls `POST /api/auth/logout` for logout.
 
+Authenticated users can review active devices with `GET /api/auth/sessions`, close one
+device with `DELETE /api/auth/sessions/:sessionId`, close other devices with
+`POST /api/auth/sessions/revoke-others`, or close every device with
+`POST /api/auth/sessions/revoke-all`.
+
 ## Backend
 
 The backend uses Fastify, TypeORM, PostgreSQL, Zod, JWT access tokens, and an HTTP-only refresh cookie. It currently exposes health, authentication, account, category, transaction, budget, preference, and protected internal endpoints.
@@ -58,6 +63,8 @@ Current fields:
 - `theme`: `light`, `dark`, or `system`
 - `hideBalances`
 - `budgetAlerts`
+- `scheduledPaymentReminders`
+- `unusualSpendingAlerts`
 
 ## Frontend Structure
 

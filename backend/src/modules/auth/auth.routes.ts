@@ -133,6 +133,13 @@ function hasValidOAuthState(request: FastifyRequest, state: string | undefined) 
   return Boolean(state && request.cookies[oauthStateCookieName] === state);
 }
 
+function getBearerAccessToken(request: FastifyRequest) {
+  const authorizationHeader = request.headers.authorization;
+  return authorizationHeader?.startsWith('Bearer ')
+    ? authorizationHeader.slice(7)
+    : undefined;
+}
+
 export const buildAuthRoutes =
   (authService: AuthService, authAbuseProtection: AuthAbuseProtection): FastifyPluginAsync =>
   async (app) => {
@@ -178,7 +185,7 @@ export const buildAuthRoutes =
       await authAbuseProtection.assertCodeActionAllowed(request, parsed.data.email, 'verify-email');
 
       try {
-        const session = await authService.verifyEmail(parsed.data, reply);
+        const session = await authService.verifyEmail(parsed.data, reply, request);
         await authAbuseProtection.recordCodeActionSuccess(request, parsed.data.email, 'verify-email');
         logSecurityEvent(
           'auth.verify_email.success',
@@ -231,7 +238,7 @@ export const buildAuthRoutes =
       await authAbuseProtection.assertLoginAllowed(request, parsed.data.email);
 
       try {
-        const session = await authService.login(parsed.data, reply);
+        const session = await authService.login(parsed.data, reply, request);
         await authAbuseProtection.recordLoginSuccess(request, parsed.data.email);
         logSecurityEvent(
           'auth.login.success',
@@ -258,7 +265,7 @@ export const buildAuthRoutes =
           .send(validationError('Datos de Google inválidos.', parsed.error.flatten().fieldErrors));
       }
 
-      const session = await authService.loginWithGoogle(parsed.data, reply);
+      const session = await authService.loginWithGoogle(parsed.data, reply, request);
       logSecurityEvent('auth.google_token_login.success', request, { userId: session.user.id }, 'info');
       return reply.code(200).send(session);
     });
@@ -306,7 +313,7 @@ export const buildAuthRoutes =
 
       try {
         const accessToken = await authService.exchangeGoogleCode(query.code);
-        const session = await authService.loginWithGoogle({ accessToken }, reply);
+        const session = await authService.loginWithGoogle({ accessToken }, reply, request);
         logSecurityEvent('auth.google_oauth.success', request, { userId: session.user.id }, 'info');
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
@@ -373,7 +380,7 @@ export const buildAuthRoutes =
       try {
         const accessToken = await authService.exchangeMicrosoftCode(query.code);
         const profile = await authService.getMicrosoftUserProfile(accessToken);
-        const session = await authService.loginWithMicrosoft(profile, reply);
+        const session = await authService.loginWithMicrosoft(profile, reply, request);
         logSecurityEvent('auth.microsoft_oauth.success', request, { userId: session.user.id }, 'info');
         return reply.redirect(
           buildOAuthCallbackUrl(frontendUrl, {
@@ -458,7 +465,7 @@ export const buildAuthRoutes =
       await authAbuseProtection.consumeRateLimit(request, 'refresh', env.authRefreshRateLimitMax);
 
       const refreshToken = request.cookies[env.jwtRefreshCookieName];
-      const session = await authService.refreshSession(refreshToken, reply);
+      const session = await authService.refreshSession(refreshToken, reply, request);
       return reply.code(200).send(session);
     });
 
@@ -468,6 +475,37 @@ export const buildAuthRoutes =
       const refreshToken = request.cookies[env.jwtRefreshCookieName];
       await authService.logout(refreshToken, reply);
       return reply.code(204).send();
+    });
+
+    app.get('/sessions', async (request, reply) => {
+      const sessions = await authService.listSessions(getBearerAccessToken(request));
+      return reply.code(200).send(sessions);
+    });
+
+    app.delete('/sessions/:sessionId', async (request, reply) => {
+      const params = request.params as { sessionId?: string };
+
+      if (!params.sessionId) {
+        return reply.code(400).send({ message: 'Falta el identificador de la sesión.' });
+      }
+
+      const result = await authService.revokeSession(
+        getBearerAccessToken(request),
+        request.cookies[env.jwtRefreshCookieName],
+        params.sessionId,
+        reply,
+      );
+      return reply.code(200).send(result);
+    });
+
+    app.post('/sessions/revoke-others', async (request, reply) => {
+      const result = await authService.revokeOtherSessions(getBearerAccessToken(request), reply);
+      return reply.code(200).send(result);
+    });
+
+    app.post('/sessions/revoke-all', async (request, reply) => {
+      const result = await authService.revokeAllSessions(getBearerAccessToken(request), reply);
+      return reply.code(200).send(result);
     });
 
     app.delete('/account', async (request, reply) => {
@@ -481,30 +519,21 @@ export const buildAuthRoutes =
           .send(validationError('Confirmación de eliminación inválida.', parsed.error.flatten().fieldErrors));
       }
 
-      const authorizationHeader = request.headers.authorization;
-      const accessToken = authorizationHeader?.startsWith('Bearer ')
-        ? authorizationHeader.slice(7)
-        : undefined;
+      const accessToken = getBearerAccessToken(request);
       const deletedUser = await authService.deleteOwnAccount(accessToken, parsed.data, reply);
       logSecurityEvent('auth.account_deleted', request, { userId: deletedUser.userId }, 'info');
       return reply.code(204).send();
     });
 
     app.get('/me', async (request, reply) => {
-      const authorizationHeader = request.headers.authorization;
-      const accessToken = authorizationHeader?.startsWith('Bearer ')
-        ? authorizationHeader.slice(7)
-        : undefined;
+      const accessToken = getBearerAccessToken(request);
 
       const user = await authService.getCurrentUser(accessToken);
       return reply.code(200).send({ user });
     });
 
     app.post('/initialize-data', async (request, reply) => {
-      const authorizationHeader = request.headers.authorization;
-      const accessToken = authorizationHeader?.startsWith('Bearer ')
-        ? authorizationHeader.slice(7)
-        : undefined;
+      const accessToken = getBearerAccessToken(request);
 
       const user = await authService.initializeUserData(accessToken);
       return reply.code(200).send({ user });

@@ -3,6 +3,7 @@ import { DataSource } from 'typeorm';
 import { env } from '../config/env';
 import { Account } from '../entities/account.entity';
 import { AuthIdentity } from '../entities/auth-identity.entity';
+import { AuthSession } from '../entities/auth-session.entity';
 import { AuthThrottleBucket } from '../entities/auth-throttle-bucket.entity';
 import { Budget } from '../entities/budget.entity';
 import { BudgetPeriodRecord } from '../entities/budget-period.entity';
@@ -23,6 +24,7 @@ import { AddAuthThrottleBuckets1780000000002 } from './migrations/1780000000002-
 import { AddEmailSyncImportReview1780000000003 } from './migrations/1780000000003-AddEmailSyncImportReview';
 import { AddExternalEmailConnections1780000000004 } from './migrations/1780000000004-AddExternalEmailConnections';
 import { AddMultiCurrencyTransfers1780000000005 } from './migrations/1780000000005-AddMultiCurrencyTransfers';
+import { AddAuthSessionsAndNotificationPreferences1780000000006 } from './migrations/1780000000006-AddAuthSessionsAndNotificationPreferences';
 
 export const appDataSource = new DataSource({
   type: 'postgres',
@@ -33,6 +35,7 @@ export const appDataSource = new DataSource({
   entities: [
     User,
     AuthIdentity,
+    AuthSession,
     AuthThrottleBucket,
     Account,
     UserPreference,
@@ -55,5 +58,6 @@ export const appDataSource = new DataSource({
     AddEmailSyncImportReview1780000000003,
     AddExternalEmailConnections1780000000004,
     AddMultiCurrencyTransfers1780000000005,
+    AddAuthSessionsAndNotificationPreferences1780000000006,
   ],
 });

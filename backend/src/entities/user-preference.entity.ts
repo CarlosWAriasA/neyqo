@@ -46,6 +46,12 @@ export class UserPreference {
   @Column({ name: 'budget_alerts', type: 'boolean', default: true })
   budgetAlerts!: boolean;
 
+  @Column({ name: 'scheduled_payment_reminders', type: 'boolean', default: true })
+  scheduledPaymentReminders!: boolean;
+
+  @Column({ name: 'unusual_spending_alerts', type: 'boolean', default: true })
+  unusualSpendingAlerts!: boolean;
+
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt!: Date;
 

@@ -18,3 +18,13 @@ export interface AuthSession {
   tokenType: 'Bearer';
   expiresIn: string;
 }
+
+export interface AuthSessionDevice {
+  id: string;
+  userAgent: string | null;
+  ipAddress: string | null;
+  current: boolean;
+  createdAt: string;
+  lastUsedAt: string;
+  expiresAt: string;
+}

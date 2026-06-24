@@ -1,16 +1,21 @@
 import { EyeOff, KeyRound, ShieldCheck, Trash2 } from 'lucide-react';
 import type { UserPreferences } from '../../../config/userPreferences';
+import type { AuthUser } from '../../../types/auth';
 import { Badge } from '../../../components/ui/badge';
 import { Button } from '../../../components/ui/button';
 import { Card } from '../../../components/ui/card';
 import { ToggleRow } from './ToggleRow';
 
 interface SecurityPrivacyCardProps {
+  user: AuthUser | null;
   preferences: UserPreferences;
   onChange: <Key extends keyof UserPreferences>(key: Key, value: UserPreferences[Key]) => void;
 }
 
-export function SecurityPrivacyCard({ preferences, onChange }: SecurityPrivacyCardProps) {
+export function SecurityPrivacyCard({ user, preferences, onChange }: SecurityPrivacyCardProps) {
+  const canChangePassword = Boolean(user?.hasPasswordAccess);
+  const linkedProviders = user?.providers.filter((provider) => provider !== 'email') ?? [];
+
   return (
     <Card>
       <div className="flex items-center gap-3">
@@ -25,20 +30,37 @@ export function SecurityPrivacyCard({ preferences, onChange }: SecurityPrivacyCa
           checked={preferences.hideBalances}
           onChange={(checked) => onChange('hideBalances', checked)}
         />
-        <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-border bg-muted/30 p-4">
-          <span className="flex gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-primary-soft text-primary">
-              <KeyRound className="h-5 w-5" aria-hidden="true" />
+        {canChangePassword ? (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-border bg-muted/30 p-4">
+            <span className="flex gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-primary-soft text-primary">
+                <KeyRound className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block text-sm font-medium text-text">Cambiar contraseña</span>
+                <span className="mt-1 block text-sm leading-6 text-subtle">Actualiza tu acceso por correo.</span>
+              </span>
             </span>
-            <span>
-              <span className="block text-sm font-medium text-text">Cambiar contraseña</span>
-              <span className="mt-1 block text-sm leading-6 text-subtle">Mantén actualizado tu acceso.</span>
+            <Button variant="secondary" onClick={() => { window.location.href = '/forgot-password'; }}>
+              Actualizar
+            </Button>
+          </div>
+        ) : (
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-border bg-muted/30 p-4">
+            <span className="flex gap-3">
+              <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-primary-soft text-primary">
+                <KeyRound className="h-5 w-5" aria-hidden="true" />
+              </span>
+              <span>
+                <span className="block text-sm font-medium text-text">Acceso vinculado</span>
+                <span className="mt-1 block text-sm leading-6 text-subtle">
+                  Esta cuenta entra con {formatProviders(linkedProviders)}.
+                </span>
+              </span>
             </span>
-          </span>
-          <Button variant="secondary" disabled>
-            En camino
-          </Button>
-        </div>
+            <Badge tone="neutral">Sin contraseña</Badge>
+          </div>
+        )}
         <div className="flex flex-wrap items-center justify-between gap-3 rounded-panel border border-danger/30 bg-danger/5 p-4">
           <span className="flex gap-3">
             <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-panel bg-danger/10 text-danger">
@@ -54,4 +76,16 @@ export function SecurityPrivacyCard({ preferences, onChange }: SecurityPrivacyCa
       </div>
     </Card>
   );
+}
+
+function formatProviders(providers: AuthUser['providers']) {
+  if (providers.includes('google')) {
+    return 'Google';
+  }
+
+  if (providers.includes('microsoft')) {
+    return 'Microsoft';
+  }
+
+  return 'un proveedor externo';
 }

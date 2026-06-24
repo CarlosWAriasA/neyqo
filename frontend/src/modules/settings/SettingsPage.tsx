@@ -1,8 +1,16 @@
 import { Save } from 'lucide-react';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { deleteAccount, logout, restoreStoredUser } from '../../api/auth';
+import {
+  deleteAccount,
+  getAuthSessions,
+  logout,
+  restoreStoredUser,
+  revokeAllAuthSessions,
+  revokeAuthSession,
+  revokeOtherAuthSessions,
+} from '../../api/auth';
 import { updateUserPreferences } from '../../api/preferences';
 import { PageHeader } from '../../components/common/PageHeader';
 import { Skeleton } from '../../components/common/Skeleton';
@@ -46,6 +54,10 @@ export function SettingsPage() {
   const [logoutOpen, setLogoutOpen] = useState(false);
   const [deleteAccountOpen, setDeleteAccountOpen] = useState(false);
   const [logoutPending, setLogoutPending] = useState(false);
+  const sessionsQuery = useQuery({
+    queryKey: ['auth', 'sessions'],
+    queryFn: getAuthSessions,
+  });
   const savePreferencesMutation = useMutation({
     mutationFn: updateUserPreferences,
     onSuccess: (serverPreferences) => {
@@ -66,6 +78,46 @@ export function SettingsPage() {
     mutationFn: deleteAccount,
     onSuccess: () => {
       toast.success('Tu cuenta fue eliminada.');
+      window.location.href = '/';
+    },
+    onError: (error) => {
+      toast.error(getAccountActionErrorMessage(error));
+    },
+  });
+  const revokeSessionMutation = useMutation({
+    mutationFn: revokeAuthSession,
+    onSuccess: (result) => {
+      if (result.revokedCurrentSession) {
+        toast.success('Sesión cerrada.');
+        window.location.href = '/';
+        return;
+      }
+
+      toast.success('Dispositivo cerrado.');
+      void sessionsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(getAccountActionErrorMessage(error));
+    },
+  });
+  const revokeOtherSessionsMutation = useMutation({
+    mutationFn: revokeOtherAuthSessions,
+    onSuccess: (result) => {
+      toast.success(
+        result.revokedCount === 1
+          ? 'Cerramos 1 dispositivo.'
+          : `Cerramos ${result.revokedCount} dispositivos.`,
+      );
+      void sessionsQuery.refetch();
+    },
+    onError: (error) => {
+      toast.error(getAccountActionErrorMessage(error));
+    },
+  });
+  const revokeAllSessionsMutation = useMutation({
+    mutationFn: revokeAllAuthSessions,
+    onSuccess: () => {
+      toast.success('Cerramos todas tus sesiones.');
       window.location.href = '/';
     },
     onError: (error) => {
@@ -141,13 +193,24 @@ export function SettingsPage() {
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
-        <SecurityPrivacyCard preferences={preferences} onChange={updatePreference} />
+        <SecurityPrivacyCard user={user} preferences={preferences} onChange={updatePreference} />
         <NotificationSettingsCard preferences={preferences} onChange={updatePreference} />
       </section>
 
       <section className="grid gap-4 xl:grid-cols-2">
         <IntegrationsSettingsCard />
-        <SessionCard onLogoutClick={() => setLogoutOpen(true)} />
+        <SessionCard
+          sessions={sessionsQuery.data ?? []}
+          loading={sessionsQuery.isLoading}
+          pendingSessionId={revokeSessionMutation.variables}
+          pendingAll={revokeAllSessionsMutation.isPending}
+          pendingOthers={revokeOtherSessionsMutation.isPending}
+          onRefresh={() => void sessionsQuery.refetch()}
+          onLogoutClick={() => setLogoutOpen(true)}
+          onRevokeSession={(sessionId) => revokeSessionMutation.mutate(sessionId)}
+          onRevokeOthers={() => revokeOtherSessionsMutation.mutate()}
+          onRevokeAll={() => revokeAllSessionsMutation.mutate()}
+        />
       </section>
 
       <section>

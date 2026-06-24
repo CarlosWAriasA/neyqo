@@ -18,6 +18,10 @@ The original source was `C:\Users\carlo\Programming\generic-login\backend`. The 
 - `POST /api/auth/password/reset`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
+- `GET /api/auth/sessions`
+- `DELETE /api/auth/sessions/:sessionId`
+- `POST /api/auth/sessions/revoke-others`
+- `POST /api/auth/sessions/revoke-all`
 - `DELETE /api/auth/account`
 - `GET /api/auth/me`
 - `GET /api/auth/oauth/google/start` placeholder

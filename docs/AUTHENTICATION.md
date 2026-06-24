@@ -28,6 +28,17 @@ The backend also sets an HTTP-only refresh cookie.
 - `POST /api/auth/refresh` uses the HTTP-only refresh cookie.
 - `POST /api/auth/logout` clears the backend refresh token and local client state.
 
+## Session Devices
+
+Neyqo stores refresh sessions per device. Authenticated users can:
+
+- `GET /api/auth/sessions`
+- `DELETE /api/auth/sessions/:sessionId`
+- `POST /api/auth/sessions/revoke-others`
+- `POST /api/auth/sessions/revoke-all`
+
+Revoking a device invalidates its refresh token. Existing access tokens may remain valid until their short expiry.
+
 ## Social Login
 
 Google and Microsoft buttons start a backend-owned OAuth flow and return to the React callback route:

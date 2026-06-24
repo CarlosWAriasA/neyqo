@@ -62,6 +62,10 @@ Neyqo React owns the auth screens. It calls the copied Fastify backend:
 - `POST /api/auth/password/reset`
 - `POST /api/auth/refresh`
 - `POST /api/auth/logout`
+- `GET /api/auth/sessions`
+- `DELETE /api/auth/sessions/:sessionId`
+- `POST /api/auth/sessions/revoke-others`
+- `POST /api/auth/sessions/revoke-all`
 - `GET /api/auth/me`
 
 Local storage keys:
