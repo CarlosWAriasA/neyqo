@@ -1,3 +1,5 @@
+import type { ExternalConnection } from '../../database/entities/external-connection.entity';
+
 export type EmailProviderName = 'gmail' | 'outlook';
 export type DominicanBankCode =
   | 'popular'
@@ -32,8 +34,9 @@ export interface EmailMessage {
 
 export interface EmailProvider {
   readonly name: EmailProviderName;
-  refreshAccessTokenIfNeeded(userId: string): Promise<void>;
-  fetchNewMessages(userId: string, cursor?: string): Promise<EmailMessage[]>;
+  refreshAccessTokenIfNeeded(connection: ExternalConnection): Promise<ExternalConnection>;
+  fetchNewMessages(connection: ExternalConnection, accessToken: string, options: { limit: number }): Promise<EmailMessage[]>;
+  decryptAccessToken(connection: ExternalConnection): string;
 }
 
 export interface ParsedEmailTransaction {

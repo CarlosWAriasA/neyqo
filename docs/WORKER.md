@@ -5,7 +5,7 @@
 ## Current Jobs
 
 - `scheduled-transactions`: enabled by default. Claims active scheduled transactions whose `next_execution_date` is due, creates normal transactions through the protected API endpoint, advances `next_execution_date`, and records job runs/errors.
-- `email-sync`: registered but disabled by default. Provider contracts exist for Gmail and Outlook, and duplicate prevention is prepared through `email_synced_messages(user_id, provider, external_message_id)`.
+- `email-sync`: disabled by default. Reads connected Gmail and Outlook accounts from `external_connections`, refreshes provider tokens, fetches recent bank alert emails, parses supported Dominican bank formats, sends detections to the API through the protected internal endpoint, and prevents duplicate processing through `email_synced_messages(user_id, provider, external_message_id)`.
 
 ## API Boundary
 
@@ -17,6 +17,38 @@ X-Internal-Service-Secret: <INTERNAL_SERVICE_SECRET>
 ```
 
 The main API validates the secret and reuses `TransactionsService`, so balances and existing transaction validation stay centralized.
+
+For email sync, the worker sends parsed detections through:
+
+```text
+POST /internal/email-sync/imported-transactions
+X-Internal-Service-Secret: <INTERNAL_SERVICE_SECRET>
+```
+
+The API owns matching import rules, automatic high-confidence import, and user review records.
+
+## Email Sync
+
+Email sync requires the same `EXTERNAL_TOKEN_ENCRYPTION_KEY` used by the backend because provider access and refresh tokens are encrypted in `external_connections`.
+
+Configure the provider credentials needed by the enabled provider:
+
+```text
+EMAIL_SYNC_JOB_ENABLED=true
+EXTERNAL_TOKEN_ENCRYPTION_KEY=<same value as backend>
+GOOGLE_CLIENT_ID=
+GOOGLE_CLIENT_SECRET=
+MICROSOFT_CLIENT_ID=
+MICROSOFT_CLIENT_SECRET=
+MICROSOFT_TENANT_ID=
+```
+
+Current parser coverage:
+
+- Banesco card alerts with card last digits, amount, merchant, date, and approval status.
+- Qik card alerts with masked card, merchant/location, amount, and email timestamp.
+
+The worker does not store full email bodies. It sends parsed metadata and a bounded audit description to the API.
 
 ## Locking Strategy
 
@@ -39,6 +71,7 @@ npm run worker:dev
 ```
 
 Set the same `INTERNAL_SERVICE_SECRET` in `backend/.env` and `neyqo-worker/.env`.
+Set the same `EXTERNAL_TOKEN_ENCRYPTION_KEY` in both services when `EMAIL_SYNC_JOB_ENABLED=true`.
 
 ## Production Notes
 

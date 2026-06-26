@@ -48,8 +48,8 @@ npm run frontend:lint
 - Landing page exists.
 - React auth screens exist for email/password registration, login, password recovery, and reset.
 - Social login buttons are UI-ready but require provider configuration.
-- Email sync UI exists as a placeholder with clear privacy separation.
-- Some financial and sync data are still mocked centrally while modules move to backend endpoints.
+- Email sync UI, mail OAuth separation, import rules, detected transaction review, and initial Gmail/Outlook worker fetching exist.
+- Sync run history is still mocked while user-facing manual sync and run history endpoints are defined.
 - Dark mode is implemented with persisted preference.
 - The first worker service exists for scheduled transactions and future email sync jobs.
 - Programados now uses backend scheduled transaction endpoints.

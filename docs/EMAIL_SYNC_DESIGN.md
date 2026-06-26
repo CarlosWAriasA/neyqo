@@ -4,7 +4,7 @@
 
 Email sync will reduce manual transaction entry by detecting bank or card consumption messages sent to the user's email.
 
-Email import rules, imported transaction review storage, automatic high-confidence expense creation, and mail OAuth connection storage are implemented. Provider inbox fetching is still pending.
+Email import rules, imported transaction review storage, automatic high-confidence expense creation, mail OAuth connection storage, and initial provider inbox fetching are implemented. The worker currently supports bounded Gmail and Outlook inbox reads for supported bank alert formats.
 
 ## Consent
 
@@ -139,8 +139,8 @@ Use provider, source message ID, merchant, amount, currency, transaction date, a
 
 ## Pending
 
-- Provider inbox fetching for Gmail and Outlook.
-- Manual sync endpoint.
+- User-facing manual sync endpoint.
 - Sync run history endpoint.
 - More bank email parsing strategies.
 - User review import action for low-confidence transactions.
+- Broader provider query tuning and pagination beyond the initial bounded fetch.

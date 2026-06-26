@@ -91,5 +91,31 @@ export function buildHealthServer(params: {
     return reply.code(200).send({ result });
   });
 
+  app.post('/internal/jobs/email-sync/run', async (request, reply) => {
+    const receivedSecret = getHeaderValue(request.headers['x-internal-service-secret']);
+
+    if (!secretMatches(receivedSecret)) {
+      return reply.code(401).send({
+        message: 'Solicitud interna no autorizada.',
+      });
+    }
+
+    const parsed = manualRunSchema.safeParse(request.body ?? {});
+
+    if (!parsed.success) {
+      return reply.code(400).send({
+        message: 'Datos de ejecución inválidos.',
+        errors: parsed.error.flatten().fieldErrors,
+      });
+    }
+
+    const result = await params.scheduler.runJob('email-sync', {
+      triggeredBy: 'manual',
+      userId: parsed.data.userId,
+    });
+
+    return reply.code(200).send({ result });
+  });
+
   return app;
 }

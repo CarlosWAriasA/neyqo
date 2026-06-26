@@ -40,7 +40,13 @@ processed_at
 
 ### email-sync
 
-Disabled by default. The job, provider contracts, parser contract, and duplicate table are prepared. Gmail and Outlook implementations intentionally throw until OAuth token storage and provider integrations are implemented securely.
+Disabled by default. It reads connected Gmail and Outlook accounts from `external_connections`, refreshes provider tokens, fetches recent inbox messages likely to be bank alerts, parses supported bank formats, and sends detections to:
+
+```text
+POST /internal/email-sync/imported-transactions
+```
+
+The API matches user import rules, creates high-confidence expenses when appropriate, and stores lower-confidence detections for review. Duplicate provider messages are guarded by `email_synced_messages`.
 
 ## Environment
 
@@ -50,9 +56,11 @@ Copy `.env.example` to `.env` and set:
 DATABASE_URL=
 NEYQO_API_BASE_URL=
 INTERNAL_SERVICE_SECRET=
+EXTERNAL_TOKEN_ENCRYPTION_KEY=
 ```
 
 `INTERNAL_SERVICE_SECRET` must match the backend value. Never expose it to the frontend.
+When `EMAIL_SYNC_JOB_ENABLED=true`, `EXTERNAL_TOKEN_ENCRYPTION_KEY` must match the backend value so the worker can decrypt provider tokens. Configure `GOOGLE_CLIENT_ID`/`GOOGLE_CLIENT_SECRET` and/or `MICROSOFT_CLIENT_ID`/`MICROSOFT_CLIENT_SECRET` for the providers you want the worker to process.
 
 ## Local Development
 
@@ -80,6 +88,15 @@ To process one user only:
 
 ```json
 { "userId": "00000000-0000-0000-0000-000000000000" }
+```
+
+Email sync can be triggered the same way:
+
+```bash
+curl -X POST http://localhost:3010/internal/jobs/email-sync/run \
+  -H "Content-Type: application/json" \
+  -H "X-Internal-Service-Secret: $INTERNAL_SERVICE_SECRET" \
+  -d "{}"
 ```
 
 ## Production

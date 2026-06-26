@@ -8,6 +8,8 @@ import { EmailSyncJob } from './jobs/email-sync/job';
 import { PendingEmailTransactionParser } from './jobs/email-sync/email-transaction-parser';
 import { GmailEmailProvider } from './jobs/email-sync/providers/gmail-email-provider';
 import { OutlookEmailProvider } from './jobs/email-sync/providers/outlook-email-provider';
+import { ExternalTokenCipher } from './jobs/email-sync/token-cipher';
+import type { EmailProvider } from './jobs/email-sync/types';
 import { ScheduledTransactionsJob } from './jobs/scheduled-transactions/job';
 import { ScheduledTransactionsRepository } from './jobs/scheduled-transactions/repository';
 import { ScheduledTransactionsService } from './jobs/scheduled-transactions/service';
@@ -17,9 +19,36 @@ async function bootstrap() {
     throw new Error('INTERNAL_SERVICE_SECRET es obligatorio cuando WORKER_ENABLED=true.');
   }
 
+  if (env.workerEnabled && env.emailSync.enabled && !env.externalTokenEncryptionKey) {
+    throw new Error('EXTERNAL_TOKEN_ENCRYPTION_KEY es obligatorio cuando EMAIL_SYNC_JOB_ENABLED=true.');
+  }
+
   await workerDataSource.initialize();
 
   const apiClient = new NeyqoApiClient(env.neyqoApiBaseUrl, env.internalServiceSecret);
+  const externalTokenCipher = env.externalTokenEncryptionKey
+    ? new ExternalTokenCipher(env.externalTokenEncryptionKey)
+    : undefined;
+  const emailProviders: EmailProvider[] = [];
+
+  if (externalTokenCipher && env.googleClientId && env.googleClientSecret) {
+    emailProviders.push(
+      new GmailEmailProvider(workerDataSource, externalTokenCipher, {
+        clientId: env.googleClientId,
+        clientSecret: env.googleClientSecret,
+      }),
+    );
+  }
+
+  if (externalTokenCipher && env.microsoftClientId && env.microsoftClientSecret) {
+    emailProviders.push(
+      new OutlookEmailProvider(workerDataSource, externalTokenCipher, {
+        clientId: env.microsoftClientId,
+        clientSecret: env.microsoftClientSecret,
+        tenantId: env.microsoftTenantId,
+      }),
+    );
+  }
   const scheduledRepository = new ScheduledTransactionsRepository(workerDataSource);
   const scheduledService = new ScheduledTransactionsService(scheduledRepository, apiClient, {
     batchSize: env.scheduledTransactions.batchSize,
@@ -37,8 +66,11 @@ async function bootstrap() {
     new EmailSyncJob(
       env.emailSync.enabled,
       env.emailSync.intervalMs,
-      [new GmailEmailProvider(), new OutlookEmailProvider()],
+      workerDataSource,
+      apiClient,
+      emailProviders,
       new PendingEmailTransactionParser(),
+      { batchSize: env.emailSync.batchSize },
     ),
   ]);
   const app = buildHealthServer({
