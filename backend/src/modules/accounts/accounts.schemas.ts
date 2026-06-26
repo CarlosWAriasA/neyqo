@@ -7,7 +7,15 @@ export const createAccountSchema = z.object({
   name: z.string().trim().min(2, 'Escribe un nombre claro.').max(90),
   type: accountTypeSchema,
   currency: currencyCodeSchema,
-  initialBalance: z.coerce.number().finite().min(-999_999_999.99).max(999_999_999.99).default(0),
+  institutionName: z.string().trim().min(2).max(90).optional(),
+  lastFour: z.string().trim().regex(/^\d{4}$/, 'Usa exactamente 4 dígitos.').optional(),
+  initialBalance: z.coerce
+    .number()
+    .finite()
+    .min(-999_999_999.99)
+    .max(999_999_999.99)
+    .multipleOf(0.01, 'Usa como máximo dos decimales.')
+    .default(0),
   description: z.string().trim().max(240).optional(),
 });
 

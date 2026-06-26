@@ -37,6 +37,12 @@ export class Account {
   @Column({ type: 'varchar', length: 3 })
   currency!: CurrencyCode;
 
+  @Column({ name: 'institution_name', type: 'varchar', length: 90, nullable: true })
+  institutionName!: string | null;
+
+  @Column({ name: 'last_four', type: 'varchar', length: 4, nullable: true })
+  lastFour!: string | null;
+
   @Column({ name: 'initial_balance', type: 'numeric', precision: 14, scale: 2, default: 0 })
   initialBalance!: string;
 

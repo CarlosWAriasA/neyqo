@@ -41,6 +41,7 @@ export function TransactionPanel({
   const selectedDestinationAmount = form.watch('destinationAmount');
   const sourceAccount = activeAccounts.find((account) => account.id === selectedSourceAccountId);
   const destinationAccount = activeAccounts.find((account) => account.id === selectedDestinationAccountId);
+  const destinationAccounts = activeAccounts.filter((account) => account.id !== selectedSourceAccountId);
   const isCrossCurrencyTransfer = Boolean(
     selectedType === 'transfer' &&
     sourceAccount &&
@@ -70,11 +71,29 @@ export function TransactionPanel({
     }
   }, [form, isCrossCurrencyTransfer]);
 
+  useEffect(() => {
+    if (selectedSourceAccountId && selectedSourceAccountId === selectedDestinationAccountId) {
+      form.setValue('destinationAccountId', '', { shouldDirty: true, shouldValidate: true });
+    }
+  }, [form, selectedDestinationAccountId, selectedSourceAccountId]);
+
   function handleTypeChange(type: Transaction['type']) {
     form.setValue('type', type, { shouldDirty: true, shouldValidate: true });
     form.setValue('categoryId', '', { shouldDirty: true });
     form.setValue('destinationAccountId', '', { shouldDirty: true });
     form.setValue('destinationAmount', undefined, { shouldDirty: true });
+  }
+
+  function handleSubmit(values: TransactionFormSubmitValues) {
+    if (isCrossCurrencyTransfer && !values.destinationAmount) {
+      form.setError('destinationAmount', {
+        type: 'manual',
+        message: 'Indica el monto recibido en la cuenta destino.',
+      });
+      return;
+    }
+
+    onSubmit(values);
   }
 
   return (
@@ -95,7 +114,7 @@ export function TransactionPanel({
               {selectedTransaction ? 'Editar transacción' : 'Nueva transacción'}
             </h2>
             <p className="mt-1 text-sm text-subtle">
-              Los balances se actualizan cuando el estado está completado.
+              Solo las transacciones completadas afectan balances. Usa pendiente para movimientos futuros.
             </p>
           </div>
           <Button variant="ghost" size="icon" aria-label="Cerrar" onClick={onClose}>
@@ -103,7 +122,7 @@ export function TransactionPanel({
           </Button>
         </div>
 
-        <form className="grid gap-4" onSubmit={form.handleSubmit(onSubmit)}>
+        <form className="grid gap-4" onSubmit={form.handleSubmit(handleSubmit)}>
           <div className="grid gap-4 md:grid-cols-3">
             <Field label="Tipo">
               <Select value={selectedType} onChange={(event) => handleTypeChange(event.target.value as Transaction['type'])}>
@@ -144,7 +163,7 @@ export function TransactionPanel({
               <Field label="Cuenta destino" error={form.formState.errors.destinationAccountId?.message}>
                 <Select {...form.register('destinationAccountId')}>
                   <option value="">Seleccionar destino</option>
-                  {activeAccounts.map((account) => (
+                  {destinationAccounts.map((account) => (
                     <option key={account.id} value={account.id}>
                       {account.name} · {formatCurrency(account.currentBalance, account.currency)}
                     </option>

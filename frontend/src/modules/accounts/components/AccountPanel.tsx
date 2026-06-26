@@ -92,10 +92,31 @@ export function AccountPanel({
               </Select>
             </Field>
           </div>
-          <Field label="Balance inicial">
+          <div className="grid gap-4 sm:grid-cols-2">
+            <Field label="Institución" error={form.formState.errors.institutionName?.message}>
+              <Input placeholder="Banco, billetera o emisor" {...form.register('institutionName')} />
+            </Field>
+            <Field label="Últimos 4 dígitos" error={form.formState.errors.lastFour?.message}>
+              <Input
+                inputMode="numeric"
+                maxLength={4}
+                placeholder="1234"
+                {...form.register('lastFour')}
+              />
+            </Field>
+          </div>
+          <Field label="Balance inicial" error={form.formState.errors.initialBalance?.message}>
             <Input type="number" step="0.01" {...form.register('initialBalance')} />
+            <p className="mt-1 text-xs leading-5 text-subtle">
+              Al editarlo, Neyqo ajusta el balance actual por la diferencia y mantiene tus movimientos.
+            </p>
           </Field>
-          <Field label="Descripción">
+          {selectedAccount ? (
+            <p className="rounded-panel border border-border bg-muted/30 p-3 text-xs leading-5 text-subtle">
+              La moneda solo puede cambiarse si la cuenta todavía no tiene movimientos, pagos programados o reglas de importación activas.
+            </p>
+          ) : null}
+          <Field label="Descripción" error={form.formState.errors.description?.message}>
             <Input placeholder="Uso principal de la cuenta" {...form.register('description')} />
           </Field>
           <div className="flex justify-end gap-2">

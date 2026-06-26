@@ -6,6 +6,8 @@ import type { AccountFormSubmitValues, AccountFormValues } from './accounts.sche
 export function toAccountPayload(values: AccountFormSubmitValues): AccountPayload {
   return {
     ...values,
+    institutionName: values.institutionName?.trim() || undefined,
+    lastFour: values.lastFour?.trim() || undefined,
     description: values.description?.trim() || undefined,
   };
 }
@@ -15,6 +17,8 @@ export function toAccountFormValues(account: Account): AccountFormValues {
     name: account.name,
     type: account.type,
     currency: account.currency,
+    institutionName: account.institutionName ?? '',
+    lastFour: account.lastFour ?? '',
     initialBalance: account.initialBalance,
     description: account.description ?? '',
   };

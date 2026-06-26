@@ -38,6 +38,7 @@ import {
   type TransactionTypeFilter,
 } from './transactions.schema';
 import {
+  formatCurrencySummary,
   groupTransactionsByDate,
   getTransactionErrorMessage,
   toTransactionFormValues,
@@ -53,13 +54,14 @@ export function TransactionsPage() {
   const [dateTo, setDateTo] = useState('');
   const [panelOpen, setPanelOpen] = useState(false);
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
+  const dateRangeInvalid = Boolean(dateFrom && dateTo && dateFrom > dateTo);
   const queryClient = useQueryClient();
   const transactionsQuery = useInfiniteTransactions({
     query: query.trim() || undefined,
     type: typeFilter,
     status: statusFilter,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+    dateFrom: dateRangeInvalid ? undefined : dateFrom || undefined,
+    dateTo: dateRangeInvalid ? undefined : dateTo || undefined,
   });
   const accountsQuery = useAccounts();
   const categoriesQuery = useCategories();
@@ -169,6 +171,9 @@ export function TransactionsPage() {
           <Input type="date" aria-label="Filtrar desde" value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} />
           <Input type="date" aria-label="Filtrar hasta" value={dateTo} onChange={(event) => setDateTo(event.target.value)} />
         </div>
+        {dateRangeInvalid ? (
+          <p className="text-sm text-danger">La fecha inicial no puede ser posterior a la fecha final.</p>
+        ) : null}
       </Card>
 
       {transactionsQuery.isError ? (
@@ -278,12 +283,16 @@ function TransactionDateGroupHeader({ group }: { group: ReturnType<typeof groupT
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-subtle">
         <span>{group.summary.count} movimientos</span>
-        {group.summary.expense > 0 ? (
-          <span className="font-medium text-danger">Gastos {formatCurrency(group.summary.expense)}</span>
-        ) : null}
-        {group.summary.income > 0 ? (
-          <span className="font-medium text-positive">Ingresos {formatCurrency(group.summary.income)}</span>
-        ) : null}
+        {formatCurrencySummary(group.summary.expense).map(([currency, amount]) => (
+          <span key={`expense-${currency}`} className="font-medium text-danger">
+            Gastos {formatCurrency(amount, currency)}
+          </span>
+        ))}
+        {formatCurrencySummary(group.summary.income).map(([currency, amount]) => (
+          <span key={`income-${currency}`} className="font-medium text-positive">
+            Ingresos {formatCurrency(amount, currency)}
+          </span>
+        ))}
       </div>
     </div>
   );

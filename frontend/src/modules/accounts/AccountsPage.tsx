@@ -1,7 +1,7 @@
 import { zodResolver } from '@hookform/resolvers/zod';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Landmark, Plus } from 'lucide-react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { toast } from 'sonner';
 import {
@@ -37,8 +37,20 @@ export function AccountsPage() {
   const queryClient = useQueryClient();
   const accountsQuery = useAccounts();
   const accounts = accountsQuery.data ?? [];
-  const totalBalance = accounts.reduce((total, account) => total + account.currentBalance, 0);
-  const activeAccounts = accounts.filter((account) => account.status === 'active').length;
+  const accountSummary = useMemo(() => {
+    const balancesByCurrency = accounts.reduce(
+      (summary, account) => {
+        summary[account.currency] = (summary[account.currency] ?? 0) + account.currentBalance;
+        return summary;
+      },
+      {} as Partial<Record<Account['currency'], number>>,
+    );
+
+    return {
+      balances: Object.entries(balancesByCurrency) as Array<[Account['currency'], number]>,
+      activeAccounts: accounts.filter((account) => account.status === 'active').length,
+    };
+  }, [accounts]);
   const form = useForm<AccountFormValues, unknown, AccountFormSubmitValues>({
     resolver: zodResolver(accountSchema),
     defaultValues: emptyAccountValues,
@@ -121,16 +133,26 @@ export function AccountsPage() {
       ) : (
         <section className="grid grid-cols-3 gap-2 md:gap-4">
           <Card className="p-3 sm:p-5">
-            <p className="text-xs leading-5 text-subtle sm:text-sm">Balance</p>
-            <p className="mt-1 text-base font-semibold text-text sm:mt-2 sm:text-2xl">{formatCurrency(totalBalance)}</p>
+            <p className="text-xs leading-5 text-subtle sm:text-sm">Balance por moneda</p>
+            <div className="mt-1 grid gap-1 sm:mt-2">
+              {accountSummary.balances.length > 0 ? (
+                accountSummary.balances.map(([currency, balance]) => (
+                  <p key={currency} className="text-base font-semibold text-text sm:text-xl">
+                    {formatCurrency(balance, currency)}
+                  </p>
+                ))
+              ) : (
+                <p className="text-base font-semibold text-text sm:text-xl">{formatCurrency(0)}</p>
+              )}
+            </div>
           </Card>
           <Card className="p-3 sm:p-5">
             <p className="text-xs leading-5 text-subtle sm:text-sm">Activas</p>
-            <p className="mt-1 text-xl font-semibold text-text sm:mt-2 sm:text-2xl">{activeAccounts}</p>
+            <p className="mt-1 text-xl font-semibold text-text sm:mt-2 sm:text-2xl">{accountSummary.activeAccounts}</p>
           </Card>
           <Card className="p-3 sm:p-5">
-            <p className="text-xs leading-5 text-subtle sm:text-sm">Moneda</p>
-            <p className="mt-1 text-xl font-semibold text-text sm:mt-2 sm:text-2xl">DOP</p>
+            <p className="text-xs leading-5 text-subtle sm:text-sm">Monedas</p>
+            <p className="mt-1 text-xl font-semibold text-text sm:mt-2 sm:text-2xl">{accountSummary.balances.length || 1}</p>
           </Card>
         </section>
       )}

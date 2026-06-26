@@ -4,10 +4,19 @@ import type { Transaction } from '../../types/financial';
 export const transactionSchema = z
   .object({
     type: z.enum(['income', 'expense', 'transfer']),
-    amount: z.coerce.number().positive('El monto debe ser mayor que cero.'),
+    amount: z.coerce
+      .number()
+      .positive('El monto debe ser mayor que cero.')
+      .max(999_999_999.99, 'El monto es demasiado alto.')
+      .refine(hasAtMostTwoDecimals, 'Usa como máximo dos decimales.'),
     sourceAccountId: z.string().min(1, 'Selecciona una cuenta origen.'),
     destinationAccountId: z.string().optional(),
-    destinationAmount: z.coerce.number().positive('El monto destino debe ser mayor que cero.').optional(),
+    destinationAmount: z.coerce
+      .number()
+      .positive('El monto destino debe ser mayor que cero.')
+      .max(999_999_999.99, 'El monto es demasiado alto.')
+      .refine(hasAtMostTwoDecimals, 'Usa como máximo dos decimales.')
+      .optional(),
     categoryId: z.string().optional(),
     description: z.string().min(2, 'Agrega una descripción.'),
     date: z.string().min(1, 'Selecciona una fecha.'),
@@ -15,6 +24,14 @@ export const transactionSchema = z
     note: z.string().optional(),
   })
   .superRefine((value, context) => {
+    if (value.status === 'completed' && value.date > new Date().toISOString().slice(0, 10)) {
+      context.addIssue({
+        code: 'custom',
+        path: ['date'],
+        message: 'Una transacción futura debe quedar pendiente.',
+      });
+    }
+
     if (value.type === 'transfer') {
       if (!value.destinationAccountId) {
         context.addIssue({
@@ -35,6 +52,14 @@ export const transactionSchema = z
       return;
     }
 
+    if (value.destinationAmount !== undefined) {
+      context.addIssue({
+        code: 'custom',
+        path: ['destinationAmount'],
+        message: 'El monto destino solo aplica a transferencias.',
+      });
+    }
+
     if (!value.categoryId) {
       context.addIssue({
         code: 'custom',
@@ -42,6 +67,7 @@ export const transactionSchema = z
         message: 'Selecciona una categoría.',
       });
     }
+
   });
 
 export type TransactionFormValues = z.input<typeof transactionSchema>;
@@ -61,3 +87,7 @@ export const emptyTransactionValues: TransactionFormValues = {
   status: 'completed',
   note: '',
 };
+
+function hasAtMostTwoDecimals(value: number) {
+  return Math.abs(value * 100 - Math.round(value * 100)) < 1e-8;
+}

@@ -66,6 +66,28 @@ Current fields:
 - `scheduledPaymentReminders`
 - `unusualSpendingAlerts`
 
+## Account Rules
+
+Accounts are user-owned ledgers. Users can rename accounts, classify them, add non-sensitive
+metadata, and correct the opening balance. When the opening balance changes, Neyqo adjusts
+the current balance by the difference so historical transaction effects remain intact.
+
+Account names are unique per user. Account currency can be changed only before the account has
+transactions, active scheduled transactions, or active import rules. Deactivation is allowed for
+historical accounts, but accounts with active scheduled transactions or active import rules must
+be moved or paused first.
+
+## Transaction Rules
+
+Only completed transactions affect balances. Pending and cancelled transactions remain visible
+without changing account totals. Completed transactions cannot be dated in the future; future
+movements should be pending until they occur.
+
+Income and expense transactions require a category matching their type and cannot include a
+destination account. Transfers require different source and destination accounts and do not use
+categories. Same-currency transfers send and receive the same amount; cross-currency transfers
+must provide the destination amount so Neyqo stores the implied exchange rate.
+
 ## Frontend Structure
 
 - `src/api`: Axios client, auth helpers, and temporary finance data access.

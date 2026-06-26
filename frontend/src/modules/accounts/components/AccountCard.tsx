@@ -33,6 +33,13 @@ export function AccountCard({
           <div className="min-w-0">
             <h2 className="truncate font-semibold text-text">{account.name}</h2>
             <p className="text-sm text-subtle">{accountTypeLabels[account.type]}</p>
+            {account.institutionName || account.lastFour ? (
+              <p className="mt-0.5 truncate text-xs text-subtle">
+                {[account.institutionName, account.lastFour ? `•••• ${account.lastFour}` : undefined]
+                  .filter(Boolean)
+                  .join(' · ')}
+              </p>
+            ) : null}
           </div>
         </div>
         <Badge tone={account.status === 'active' ? 'income' : 'neutral'}>

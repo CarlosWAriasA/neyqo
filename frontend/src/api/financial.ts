@@ -24,6 +24,8 @@ export interface AccountPayload {
   name: string;
   type: Account['type'];
   currency: Account['currency'];
+  institutionName?: string;
+  lastFour?: string;
   initialBalance: number;
   description?: string;
 }

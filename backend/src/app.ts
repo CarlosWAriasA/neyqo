@@ -1,7 +1,6 @@
 import Fastify from 'fastify';
 import { env } from './config/env';
 import { appDataSource } from './database/data-source';
-import { Account } from './entities/account.entity';
 import { AuthIdentity } from './entities/auth-identity.entity';
 import { Budget } from './entities/budget.entity';
 import { Category } from './entities/category.entity';
@@ -48,7 +47,7 @@ export async function buildApp() {
 
   const authEmailService = new AuthEmailService();
   const authAbuseProtection = new AuthAbuseProtection(appDataSource);
-  const accountsService = new AccountsService(appDataSource.getRepository(Account));
+  const accountsService = new AccountsService(appDataSource);
   const categoriesService = new CategoriesService(appDataSource.getRepository(Category));
   const budgetsService = new BudgetsService(appDataSource);
   const preferencesService = new PreferencesService(appDataSource.getRepository(UserPreference));

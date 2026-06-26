@@ -250,6 +250,7 @@ export class TransactionsService {
     userId: string,
     payload: CreateTransactionInput,
   ): Promise<ResolvedTransactionInput> {
+    this.assertCompletedTransactionDateIsNotFuture(payload);
     const sourceAccount = await this.transactionsRepository.findActiveAccount(manager, userId, payload.sourceAccountId, 'origen');
     const destinationAccount = payload.destinationAccountId
       ? await this.transactionsRepository.findActiveAccount(manager, userId, payload.destinationAccountId, 'destino')
@@ -257,6 +258,10 @@ export class TransactionsService {
     let category: Category | null = null;
 
     if (payload.type === 'transfer') {
+      if (payload.categoryId) {
+        throw new AuthError(400, 'Las transferencias no usan categoría.');
+      }
+
       if (!destinationAccount) {
         throw new AuthError(400, 'Selecciona una cuenta destino para la transferencia.');
       }
@@ -284,6 +289,10 @@ export class TransactionsService {
     } else {
       if (destinationAccount) {
         throw new AuthError(400, 'La cuenta destino solo se usa en transferencias.');
+      }
+
+      if (payload.destinationAmount !== undefined) {
+        throw new AuthError(400, 'El monto destino solo se usa en transferencias entre monedas diferentes.');
       }
 
       if (!payload.categoryId) {
@@ -329,6 +338,10 @@ export class TransactionsService {
     destinationAccount: Account,
   ): number {
     if (sourceAccount.currency === destinationAccount.currency) {
+      if (payload.destinationAmount !== undefined && payload.destinationAmount !== payload.amount) {
+        throw new AuthError(400, 'En transferencias de la misma moneda, el monto recibido debe ser igual al enviado.');
+      }
+
       return payload.amount;
     }
 
@@ -337,6 +350,16 @@ export class TransactionsService {
     }
 
     return payload.destinationAmount;
+  }
+
+  private assertCompletedTransactionDateIsNotFuture(payload: Pick<CreateTransactionInput, 'date' | 'status'>): void {
+    if (payload.status !== 'completed') {
+      return;
+    }
+
+    if (payload.date > todayDateKey()) {
+      throw new AuthError(400, 'Una transacción futura debe quedar pendiente hasta que ocurra.');
+    }
   }
 
   private resolveNextCategoryId(
@@ -394,4 +417,8 @@ export class TransactionsService {
 
 function formatExchangeRate(value: number): string {
   return value.toFixed(8);
+}
+
+function todayDateKey() {
+  return new Date().toISOString().slice(0, 10);
 }

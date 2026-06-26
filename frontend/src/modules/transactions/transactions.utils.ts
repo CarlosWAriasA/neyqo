@@ -1,6 +1,6 @@
 import type { AxiosError } from 'axios';
 import type { TransactionPayload } from '../../api/financial';
-import type { Transaction } from '../../types/financial';
+import type { CurrencyCode, Transaction } from '../../types/financial';
 import type { TransactionFormSubmitValues, TransactionFormValues } from './transactions.schema';
 
 export interface TransactionDateGroup {
@@ -10,8 +10,8 @@ export interface TransactionDateGroup {
   transactions: Transaction[];
   summary: {
     count: number;
-    income: number;
-    expense: number;
+    income: Partial<Record<CurrencyCode, number>>;
+    expense: Partial<Record<CurrencyCode, number>>;
   };
 }
 
@@ -65,8 +65,8 @@ export function groupTransactionsByDate(transactions: Transaction[]): Transactio
       transactions: [],
       summary: {
         count: 0,
-        income: 0,
-        expense: 0,
+        income: {},
+        expense: {},
       },
     };
 
@@ -74,17 +74,29 @@ export function groupTransactionsByDate(transactions: Transaction[]): Transactio
     group.summary.count += 1;
 
     if (transaction.type === 'income') {
-      group.summary.income += transaction.amount;
+      addCurrencyAmount(group.summary.income, transaction.currency ?? 'DOP', transaction.amount);
     }
 
     if (transaction.type === 'expense') {
-      group.summary.expense += transaction.amount;
+      addCurrencyAmount(group.summary.expense, transaction.currency ?? 'DOP', transaction.amount);
     }
 
     groups.set(key, group);
   });
 
   return Array.from(groups.values());
+}
+
+export function formatCurrencySummary(summary: Partial<Record<CurrencyCode, number>>) {
+  return Object.entries(summary) as Array<[CurrencyCode, number]>;
+}
+
+function addCurrencyAmount(
+  summary: Partial<Record<CurrencyCode, number>>,
+  currency: CurrencyCode,
+  amount: number,
+) {
+  summary[currency] = (summary[currency] ?? 0) + amount;
 }
 
 function getDateKey(value: string) {

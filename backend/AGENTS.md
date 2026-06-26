@@ -103,4 +103,6 @@ This backend is a copied and isolated version of `generic-login/backend`.
 - Never log passwords, access tokens, refresh tokens, one-time codes, OAuth authorization codes, or provider tokens.
 - Protected internal endpoints must use `INTERNAL_SERVICE_SECRET` and must not accept frontend user tokens as service credentials.
 - Do not fake external integrations.
+- Account balance corrections must preserve ledger math: changing `initialBalance` adjusts `currentBalance` by the difference, and currency changes are blocked once transactions, active scheduled transactions, or active import rules exist.
+- Transaction balance effects depend on status: only `completed` applies to balances. Future completed transactions, non-transfer destination fields, transfer categories, same-account transfers, and inconsistent same-currency transfer amounts must be rejected server-side.
 - Update this file if backend architecture changes.

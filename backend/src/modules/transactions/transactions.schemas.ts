@@ -11,10 +11,21 @@ export const transactionParamsSchema = z.object({
 
 export const createTransactionSchema = z.object({
   type: transactionTypeSchema,
-  amount: z.coerce.number().finite().positive('El monto debe ser mayor que cero.').max(999_999_999.99),
+  amount: z.coerce
+    .number()
+    .finite()
+    .positive('El monto debe ser mayor que cero.')
+    .max(999_999_999.99)
+    .multipleOf(0.01, 'Usa como máximo dos decimales.'),
   sourceAccountId: z.uuid(),
   destinationAccountId: z.uuid().optional(),
-  destinationAmount: z.coerce.number().finite().positive('El monto destino debe ser mayor que cero.').max(999_999_999.99).optional(),
+  destinationAmount: z.coerce
+    .number()
+    .finite()
+    .positive('El monto destino debe ser mayor que cero.')
+    .max(999_999_999.99)
+    .multipleOf(0.01, 'Usa como máximo dos decimales.')
+    .optional(),
   categoryId: z.uuid().optional(),
   description: z.string().trim().min(2).max(140),
   date: z.iso.date(),
@@ -63,6 +74,9 @@ export const listTransactionsQuerySchema = buildPaginationSchema(30).extend({
   query: z.string().trim().max(140).optional(),
   accountId: z.uuid().optional(),
   categoryId: z.uuid().optional(),
+}).refine((value) => !value.dateFrom || !value.dateTo || value.dateFrom <= value.dateTo, {
+  message: 'La fecha inicial no puede ser posterior a la fecha final.',
+  path: ['dateFrom'],
 });
 
 export type CreateTransactionInput = z.infer<typeof createTransactionSchema>;

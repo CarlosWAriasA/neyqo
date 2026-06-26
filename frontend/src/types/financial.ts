@@ -10,6 +10,8 @@ export interface Account {
   name: string;
   type: AccountType;
   currency: CurrencyCode;
+  institutionName?: string;
+  lastFour?: string;
   initialBalance: number;
   currentBalance: number;
   description?: string;
