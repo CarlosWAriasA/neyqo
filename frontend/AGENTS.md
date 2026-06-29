@@ -85,6 +85,14 @@ Theme preference is persisted in `neyqo.theme` with `light`, `dark`, or `system`
 
 The frontend exposes a web app manifest and registers `public/sw.js` only in production builds. The service worker caches the app shell and static assets, but it must not cache `/api` requests or other authenticated backend traffic.
 
+## Container Deployment
+
+- `Dockerfile` builds the Vite application and serves `dist` through Nginx.
+- `nginx.conf` provides the React Router SPA fallback and `/healthz` endpoint.
+- Production `VITE_*` values are Docker build arguments because Vite embeds them at build time.
+- The default production API is `https://neyqo-production.up.railway.app/api`; override `VITE_API_BASE_URL` at image build time for other environments.
+- Local Vite development continues to use `frontend/.env` and the `/api` development proxy.
+
 ## Rules
 
 - Keep mock data in `src/mocks`.
