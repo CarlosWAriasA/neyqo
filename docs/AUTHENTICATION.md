@@ -17,10 +17,17 @@ The React login page calls `POST /api/auth/login` and stores:
 
 The backend also sets an HTTP-only refresh cookie.
 
+Accounts created with Google or Microsoft cannot use email/password login. If their email is
+submitted to traditional login or registration, Neyqo instructs them to continue with the
+provider that created the account.
+
 ## Password Recovery
 
 - `POST /api/auth/password/forgot`
 - `POST /api/auth/password/reset`
+
+Password recovery is available only to accounts created with email and password. Social-only
+accounts do not receive reset codes and cannot use password recovery to add password access.
 
 ## Current User And Refresh
 
@@ -38,6 +45,11 @@ Neyqo stores refresh sessions per device. Authenticated users can:
 - `POST /api/auth/sessions/revoke-all`
 
 Revoking a device invalidates its refresh token. Existing access tokens may remain valid until their short expiry.
+
+The backend assigns each browser profile an opaque, HTTP-only device identifier. A new login
+from the same browser replaces its previous active session instead of adding a duplicate. Other
+browsers, private windows, and devices keep independent sessions. Clearing browser cookies makes
+the next login appear as a new device.
 
 ## Social Login
 

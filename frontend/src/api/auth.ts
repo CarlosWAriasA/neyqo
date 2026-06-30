@@ -1,3 +1,5 @@
+import type { AxiosError } from 'axios';
+
 import { apiClient, authStorage, clearSilentRefresh, scheduleSilentRefresh } from './client';
 import type { AuthSession, AuthSessionDevice, AuthUser } from '../types/auth';
 import { queryClient } from '../app/providers/queryClient';
@@ -16,6 +18,11 @@ export interface RegisterPayload {
 export interface AuthActionResponse {
   message: string;
   email?: string;
+}
+
+export function getAuthErrorMessage(error: unknown, fallback: string): string {
+  const axiosError = error as AxiosError<{ message?: string }>;
+  return axiosError.response?.data?.message || fallback;
 }
 
 function persistSession(session: AuthSession, remember = true, options?: { clearQueryCache?: boolean }) {

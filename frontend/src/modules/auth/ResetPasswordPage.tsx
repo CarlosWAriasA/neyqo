@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link } from 'react-router-dom';
 
-import { resetPassword } from '@/api/auth';
+import { getAuthErrorMessage, resetPassword } from '@/api/auth';
 import { AuthCard } from '@/components/forms/AuthCard';
 import { Field } from '@/components/forms/Field';
 import { Button } from '@/components/ui/button';
@@ -29,8 +29,8 @@ export function ResetPasswordPage() {
     try {
       const response = await resetPassword(values);
       setMessage(response.message);
-    } catch {
-      setMessage(AUTH_MESSAGES.resetPasswordError);
+    } catch (error) {
+      setMessage(getAuthErrorMessage(error, AUTH_MESSAGES.resetPasswordError));
     } finally {
       setLoading(false);
     }

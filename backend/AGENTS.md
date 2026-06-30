@@ -85,6 +85,8 @@ This backend is a copied and isolated version of `generic-login/backend`.
 - Social auth must use identity scopes only.
 - Email-reading OAuth must be implemented separately under sync-specific endpoints.
 - Never mix Neyqo session tokens with external mail integration tokens.
+- Browser profiles use an opaque HTTP-only device cookie. A new login must replace the active
+  session for the same user and device without revoking other devices.
 
 ## Future Modules
 

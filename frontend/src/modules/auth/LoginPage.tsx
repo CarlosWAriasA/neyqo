@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 
-import { login, restoreStoredUser } from '@/api/auth';
+import { getAuthErrorMessage, login, restoreStoredUser } from '@/api/auth';
 import { authStorage } from '@/api/client';
 import { AuthCard } from '@/components/forms/AuthCard';
 import { Field } from '@/components/forms/Field';
@@ -45,8 +45,8 @@ export function LoginPage() {
         { remember: values.remember ?? false },
       );
       navigate('/app/dashboard', { replace: true });
-    } catch {
-      setError(AUTH_MESSAGES.loginError);
+    } catch (error) {
+      setError(getAuthErrorMessage(error, AUTH_MESSAGES.loginError));
     } finally {
       setLoading(false);
     }

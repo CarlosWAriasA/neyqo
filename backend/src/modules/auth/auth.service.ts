@@ -1,5 +1,5 @@
 import bcrypt from 'bcryptjs';
-import { createHash, randomInt } from 'crypto';
+import { createHash, randomInt, randomUUID } from 'crypto';
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import jwt from 'jsonwebtoken';
 import type { SignOptions } from 'jsonwebtoken';
@@ -114,9 +114,10 @@ const invalidVerificationEmailMessage =
   'No pudimos confirmar ese correo. Revisa la dirección e inténtalo nuevamente.';
 const verificationEmailSendFailedMessage =
   'No pudimos enviar el código de verificación. Intenta nuevamente.';
-const socialAccountEmailConflictMessage =
-  'Ya existe una cuenta con ese correo. Inicia sesión con tu contraseña.';
-
+const deviceIdCookieName = 'neyqo.device-id';
+const deviceIdCookieMaxAgeSeconds = 60 * 60 * 24 * 730;
+const uuidPattern =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 export class AuthService {
   constructor(
     private readonly dataSource: DataSource,
@@ -134,7 +135,16 @@ export class AuthService {
     const existingUser = await this.findByEmail(payload.email);
 
     if (existingUser) {
-      throw new AuthError(409, 'Ya existe una cuenta con ese correo.');
+      const socialProvider = this.getSocialOnlyProvider(existingUser);
+
+      if (socialProvider) {
+        throw new AuthError(409, this.getSocialLoginMessage(socialProvider));
+      }
+
+      throw new AuthError(
+        409,
+        'Ya existe una cuenta con ese correo. Inicia sesión con tu correo y contraseña.',
+      );
     }
 
     const passwordHash = await bcrypt.hash(payload.password, 12);
@@ -256,7 +266,17 @@ export class AuthService {
   ): Promise<AuthSessionResponse> {
     const user = await this.findByEmailWithPassword(payload.email);
 
-    if (!user || !this.userCanLoginWithPassword(user)) {
+    if (!user) {
+      throw new AuthError(401, 'Correo o contraseña incorrectos.');
+    }
+
+    if (!this.userCanLoginWithPassword(user)) {
+      const socialProvider = this.getSocialOnlyProvider(user);
+
+      if (socialProvider) {
+        throw new AuthError(401, this.getSocialLoginMessage(socialProvider));
+      }
+
       throw new AuthError(401, 'Correo o contraseña incorrectos.');
     }
 
@@ -292,6 +312,10 @@ export class AuthService {
     const existingByGoogleSub = await this.findByIdentity('google', googleProfile.sub);
 
     if (existingByGoogleSub) {
+      if (this.getPrimaryProvider(existingByGoogleSub) !== 'google') {
+        throw new AuthError(409, this.getExistingAccountLoginMessage(existingByGoogleSub));
+      }
+
       await this.usersRepository.update(
         {
           id: existingByGoogleSub.id,
@@ -323,7 +347,7 @@ export class AuthService {
     const existingByEmail = await this.findByEmail(googleProfile.email);
 
     if (existingByEmail) {
-      throw new AuthError(409, socialAccountEmailConflictMessage);
+      throw new AuthError(409, this.getExistingAccountLoginMessage(existingByEmail));
     }
 
     const user = this.usersRepository.create({
@@ -360,9 +384,20 @@ export class AuthService {
   }
 
   async requestPasswordReset(payload: ForgotPasswordInput): Promise<AuthActionResponse> {
-    const user = await this.findByEmail(payload.email);
+    const user = await this.findByEmailWithPassword(payload.email);
 
-    if (user && user.emailVerified && this.getLinkedProviders(user).length > 0) {
+    if (user) {
+      const socialProvider = this.getSocialOnlyProvider(user);
+
+      if (socialProvider) {
+        return {
+          message: this.getSocialLoginMessage(socialProvider),
+          email: payload.email,
+        };
+      }
+    }
+
+    if (user && user.emailVerified && this.userCanLoginWithPassword(user)) {
       await this.issuePasswordResetCode(user);
     }
 
@@ -375,6 +410,14 @@ export class AuthService {
   async resetPassword(payload: ResetPasswordInput): Promise<AuthActionResponse> {
     const user = await this.findByEmailWithPasswordResetCode(payload.email);
 
+    if (user) {
+      const socialProvider = this.getSocialOnlyProvider(user);
+
+      if (socialProvider) {
+        throw new AuthError(409, this.getSocialLoginMessage(socialProvider));
+      }
+    }
+
     if (
       !user ||
       !user.emailVerified ||
@@ -386,7 +429,6 @@ export class AuthService {
       throw new AuthError(400, 'El codigo no es valido o ya expiro.');
     }
 
-    const hadPasswordAccess = this.userCanLoginWithPassword(user);
     const passwordHash = await bcrypt.hash(payload.password, 12);
 
     await this.usersRepository.update(
@@ -411,9 +453,7 @@ export class AuthService {
     });
 
     return {
-      message: hadPasswordAccess
-        ? 'Tu contraseña fue actualizada. Ya puedes iniciar sesión.'
-        : 'Tu contraseña fue creada. Ya puedes iniciar sesión con Google o con tu correo.',
+      message: 'Tu contraseña fue actualizada. Ya puedes iniciar sesión.',
       email: user.email,
     };
   }
@@ -682,6 +722,7 @@ export class AuthService {
     });
 
     this.clearRefreshCookie(reply);
+    this.clearDeviceIdCookie(reply);
     return { userId: user.id };
   }
 
@@ -693,19 +734,33 @@ export class AuthService {
     const accessTokenExpiresIn = env.jwtAccessExpiresIn as SignOptions['expiresIn'];
     const refreshTokenExpiresIn = env.jwtRefreshExpiresIn as SignOptions['expiresIn'];
     const refreshTokenExpiresAt = this.resolveFutureDate(env.jwtRefreshExpiresIn);
-    const sessionRepository = this.dataSource.getRepository(AuthSession);
     const now = new Date();
-    const session = await sessionRepository.save(
-      sessionRepository.create({
-        userId: user.id,
-        refreshTokenHash: 'pending',
-        userAgent: this.getUserAgent(request),
-        ipAddress: this.getRequestIp(request),
-        lastUsedAt: now,
-        expiresAt: refreshTokenExpiresAt,
-        revokedAt: null,
-      }),
-    );
+    const deviceId = this.getOrCreateDeviceId(request, reply);
+    const session = await this.dataSource.transaction(async (manager) => {
+      const sessionRepository = manager.getRepository(AuthSession);
+
+      await sessionRepository
+        .createQueryBuilder()
+        .update(AuthSession)
+        .set({ revokedAt: now })
+        .where('user_id = :userId', { userId: user.id })
+        .andWhere('device_id = :deviceId', { deviceId })
+        .andWhere('revoked_at IS NULL')
+        .execute();
+
+      return sessionRepository.save(
+        sessionRepository.create({
+          userId: user.id,
+          refreshTokenHash: 'pending',
+          userAgent: this.getUserAgent(request),
+          ipAddress: this.getRequestIp(request),
+          deviceId,
+          lastUsedAt: now,
+          expiresAt: refreshTokenExpiresAt,
+          revokedAt: null,
+        }),
+      );
+    });
 
     const accessToken = jwt.sign(
       {
@@ -734,7 +789,9 @@ export class AuthService {
 
     const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
 
-    await sessionRepository.update({ id: session.id }, { refreshTokenHash });
+    await this.dataSource
+      .getRepository(AuthSession)
+      .update({ id: session.id }, { refreshTokenHash });
     await this.usersRepository.update({ id: user.id }, { lastLoginAt: now });
 
     const persistedUser = await this.findById(user.id);
@@ -763,6 +820,7 @@ export class AuthService {
     const refreshTokenExpiresIn = env.jwtRefreshExpiresIn as SignOptions['expiresIn'];
     const refreshTokenExpiresAt = this.resolveFutureDate(env.jwtRefreshExpiresIn);
     const now = new Date();
+    const deviceId = this.getOrCreateDeviceId(request, reply);
 
     const accessToken = jwt.sign(
       {
@@ -789,18 +847,35 @@ export class AuthService {
       },
     );
 
-    await this.dataSource.getRepository(AuthSession).update(
-      {
-        id: session.id,
-      },
-      {
-        refreshTokenHash: await bcrypt.hash(refreshToken, 12),
-        userAgent: this.getUserAgent(request) ?? session.userAgent,
-        ipAddress: this.getRequestIp(request) ?? session.ipAddress,
-        lastUsedAt: now,
-        expiresAt: refreshTokenExpiresAt,
-      },
-    );
+    const refreshTokenHash = await bcrypt.hash(refreshToken, 12);
+
+    await this.dataSource.transaction(async (manager) => {
+      const sessionRepository = manager.getRepository(AuthSession);
+
+      await sessionRepository
+        .createQueryBuilder()
+        .update(AuthSession)
+        .set({ revokedAt: now })
+        .where('user_id = :userId', { userId: user.id })
+        .andWhere('device_id = :deviceId', { deviceId })
+        .andWhere('id != :sessionId', { sessionId: session.id })
+        .andWhere('revoked_at IS NULL')
+        .execute();
+
+      await sessionRepository.update(
+        {
+          id: session.id,
+        },
+        {
+          refreshTokenHash,
+          userAgent: this.getUserAgent(request) ?? session.userAgent,
+          ipAddress: this.getRequestIp(request) ?? session.ipAddress,
+          deviceId,
+          lastUsedAt: now,
+          expiresAt: refreshTokenExpiresAt,
+        },
+      );
+    });
     await this.usersRepository.update({ id: user.id }, { lastLoginAt: now });
 
     const persistedUser = await this.findById(user.id);
@@ -832,6 +907,34 @@ export class AuthService {
 
   private clearRefreshCookie(reply: FastifyReply): void {
     reply.clearCookie(env.jwtRefreshCookieName, {
+      sameSite: env.cookieSameSite,
+      secure: env.cookieSecure,
+      path: '/api/auth',
+      domain: env.cookieDomain,
+    });
+  }
+
+  private getOrCreateDeviceId(request: FastifyRequest | undefined, reply: FastifyReply): string {
+    const cookieDeviceId = request?.cookies[deviceIdCookieName]?.trim();
+
+    if (cookieDeviceId && uuidPattern.test(cookieDeviceId)) {
+      return cookieDeviceId.toLowerCase();
+    }
+
+    const deviceId = randomUUID();
+    reply.setCookie(deviceIdCookieName, deviceId, {
+      httpOnly: true,
+      sameSite: env.cookieSameSite,
+      secure: env.cookieSecure,
+      path: '/api/auth',
+      domain: env.cookieDomain,
+      maxAge: deviceIdCookieMaxAgeSeconds,
+    });
+    return deviceId;
+  }
+
+  private clearDeviceIdCookie(reply: FastifyReply): void {
+    reply.clearCookie(deviceIdCookieName, {
       sameSite: env.cookieSameSite,
       secure: env.cookieSecure,
       path: '/api/auth',
@@ -1176,7 +1279,42 @@ export class AuthService {
   }
 
   private userCanLoginWithPassword(user: User): boolean {
-    return this.userHasPasswordHash(user) && this.getLinkedProviders(user).includes('email');
+    const primaryProvider = this.getPrimaryProvider(user);
+    return this.userHasPasswordHash(user) && (primaryProvider === null || primaryProvider === 'email');
+  }
+
+  private getSocialOnlyProvider(user: User): 'google' | 'microsoft' | null {
+    const primaryProvider = this.getPrimaryProvider(user);
+    return primaryProvider === 'google' || primaryProvider === 'microsoft' ? primaryProvider : null;
+  }
+
+  private getPrimaryProvider(user: User): AuthProvider | null {
+    const identities = user.authIdentities ?? [];
+
+    if (identities.length === 0) {
+      return null;
+    }
+
+    return [...identities].sort((left, right) => {
+      const createdAtDifference = left.createdAt.getTime() - right.createdAt.getTime();
+      return (
+        createdAtDifference ||
+        providerSortOrder.indexOf(left.provider) - providerSortOrder.indexOf(right.provider)
+      );
+    })[0].provider;
+  }
+
+  private getSocialLoginMessage(provider: 'google' | 'microsoft'): string {
+    const providerName = provider === 'google' ? 'Google' : 'Microsoft';
+    return `Esta cuenta fue creada con ${providerName}. Continúa con ${providerName} para acceder.`;
+  }
+
+  private getExistingAccountLoginMessage(user: User): string {
+    const socialProvider = this.getSocialOnlyProvider(user);
+
+    return socialProvider
+      ? this.getSocialLoginMessage(socialProvider)
+      : 'Ya existe una cuenta con ese correo. Inicia sesión con tu correo y contraseña.';
   }
 
   private userHasPasswordHash(user: Pick<User, 'passwordHash'>): boolean {
@@ -1396,6 +1534,10 @@ export class AuthService {
     const existingByMicrosoftSub = await this.findByIdentity('microsoft', profile.sub);
 
     if (existingByMicrosoftSub) {
+      if (this.getPrimaryProvider(existingByMicrosoftSub) !== 'microsoft') {
+        throw new AuthError(409, this.getExistingAccountLoginMessage(existingByMicrosoftSub));
+      }
+
       await this.usersRepository.update(
         { id: existingByMicrosoftSub.id },
         {
@@ -1425,7 +1567,7 @@ export class AuthService {
     const existingByEmail = await this.findByEmail(profile.email);
 
     if (existingByEmail) {
-      throw new AuthError(409, socialAccountEmailConflictMessage);
+      throw new AuthError(409, this.getExistingAccountLoginMessage(existingByEmail));
     }
 
     const user = this.usersRepository.create({

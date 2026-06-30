@@ -26,6 +26,7 @@ import { AddExternalEmailConnections1780000000004 } from './migrations/178000000
 import { AddMultiCurrencyTransfers1780000000005 } from './migrations/1780000000005-AddMultiCurrencyTransfers';
 import { AddAuthSessionsAndNotificationPreferences1780000000006 } from './migrations/1780000000006-AddAuthSessionsAndNotificationPreferences';
 import { AddAccountMetadata1780000000007 } from './migrations/1780000000007-AddAccountMetadata';
+import { AddAuthSessionDeviceId1780000000008 } from './migrations/1780000000008-AddAuthSessionDeviceId';
 
 export const appDataSource = new DataSource({
   type: 'postgres',
@@ -61,5 +62,6 @@ export const appDataSource = new DataSource({
     AddMultiCurrencyTransfers1780000000005,
     AddAuthSessionsAndNotificationPreferences1780000000006,
     AddAccountMetadata1780000000007,
+    AddAuthSessionDeviceId1780000000008,
   ],
 });

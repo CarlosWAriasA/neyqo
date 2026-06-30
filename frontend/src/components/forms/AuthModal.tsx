@@ -257,7 +257,7 @@ function LoginForm({
         setUnverifiedEmail(values.email);
         setError('Debes confirmar tu correo antes de continuar.');
       } else if (status === 401) {
-        setError('Correo o contraseña incorrectos.');
+        setError(serverMsg || 'Correo o contraseña incorrectos.');
       } else {
         setError(serverMsg || 'No pudimos iniciar sesión. Intenta nuevamente.');
       }
@@ -425,7 +425,7 @@ function RegisterForm({
       const serverMsg = axiosErr.response?.data?.message;
 
       if (status === 409) {
-        setError('Ya existe una cuenta con ese correo. Inicia sesión o recupera tu contraseña.');
+        setError(serverMsg || 'Ya existe una cuenta con ese correo. Inicia sesión.');
       } else {
         setError(serverMsg || 'No pudimos crear tu cuenta. Revisa los datos e intenta nuevamente.');
       }

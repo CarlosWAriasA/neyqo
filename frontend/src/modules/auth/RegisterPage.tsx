@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useNavigate } from 'react-router-dom';
 
-import { register, restoreStoredUser } from '@/api/auth';
+import { getAuthErrorMessage, register, restoreStoredUser } from '@/api/auth';
 import { AuthCard } from '@/components/forms/AuthCard';
 import { Field } from '@/components/forms/Field';
 import { FormDivider } from '@/components/forms/FormDivider';
@@ -43,8 +43,8 @@ export function RegisterPage() {
       });
       setMessage(response.message);
       setTimeout(() => navigate('/login'), 1200);
-    } catch {
-      setError(AUTH_MESSAGES.registerError);
+    } catch (error) {
+      setError(getAuthErrorMessage(error, AUTH_MESSAGES.registerError));
     } finally {
       setLoading(false);
     }
