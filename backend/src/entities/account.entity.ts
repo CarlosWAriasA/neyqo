@@ -17,6 +17,7 @@ export type EntityStatus = 'active' | 'inactive';
 @Entity({ name: 'accounts' })
 @Index(['userId', 'status'])
 @Index(['userId', 'name'])
+@Index('idx_accounts_user_currency_status', ['userId', 'currency', 'status'])
 export class Account {
   @PrimaryGeneratedColumn('uuid')
   id!: string;

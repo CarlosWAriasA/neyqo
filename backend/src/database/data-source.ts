@@ -18,15 +18,7 @@ import { UserPreference } from '../entities/user-preference.entity';
 import { User } from '../entities/user.entity';
 import { WorkerJobError } from '../entities/worker-job-error.entity';
 import { WorkerJobRun } from '../entities/worker-job-run.entity';
-import { AddWorkerAutomation1780000000000 } from './migrations/1780000000000-AddWorkerAutomation';
-import { AddInitialDataNoticeShownToUsers1780000000001 } from './migrations/1780000000001-AddInitialDataNoticeShownToUsers';
-import { AddAuthThrottleBuckets1780000000002 } from './migrations/1780000000002-AddAuthThrottleBuckets';
-import { AddEmailSyncImportReview1780000000003 } from './migrations/1780000000003-AddEmailSyncImportReview';
-import { AddExternalEmailConnections1780000000004 } from './migrations/1780000000004-AddExternalEmailConnections';
-import { AddMultiCurrencyTransfers1780000000005 } from './migrations/1780000000005-AddMultiCurrencyTransfers';
-import { AddAuthSessionsAndNotificationPreferences1780000000006 } from './migrations/1780000000006-AddAuthSessionsAndNotificationPreferences';
-import { AddAccountMetadata1780000000007 } from './migrations/1780000000007-AddAccountMetadata';
-import { AddAuthSessionDeviceId1780000000008 } from './migrations/1780000000008-AddAuthSessionDeviceId';
+import { CreateInitialSchema1790000000000 } from './migrations/1790000000000-CreateInitialSchema';
 
 export const appDataSource = new DataSource({
   type: 'postgres',
@@ -53,15 +45,5 @@ export const appDataSource = new DataSource({
     EmailImportRule,
     ImportedTransaction,
   ],
-  migrations: [
-    AddWorkerAutomation1780000000000,
-    AddInitialDataNoticeShownToUsers1780000000001,
-    AddAuthThrottleBuckets1780000000002,
-    AddEmailSyncImportReview1780000000003,
-    AddExternalEmailConnections1780000000004,
-    AddMultiCurrencyTransfers1780000000005,
-    AddAuthSessionsAndNotificationPreferences1780000000006,
-    AddAccountMetadata1780000000007,
-    AddAuthSessionDeviceId1780000000008,
-  ],
+  migrations: [CreateInitialSchema1790000000000],
 });

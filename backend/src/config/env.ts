@@ -8,7 +8,7 @@ const envSchema = z.object({
   FRONTEND_URL: z.string().optional().default(''),
   DATABASE_URL: z.string().min(1, 'DATABASE_URL es obligatorio.'),
   DB_SSL: z.enum(['true', 'false']).default('false'),
-  DB_SYNCHRONIZE: z.enum(['true', 'false']).default('true'),
+  DB_SYNCHRONIZE: z.enum(['true', 'false']).default('false'),
   ALLOWED_ORIGINS: z.string().default('http://localhost:4200'),
   JWT_ACCESS_SECRET: z.string().min(32, 'JWT_ACCESS_SECRET debe tener al menos 32 caracteres.'),
   JWT_REFRESH_SECRET: z
