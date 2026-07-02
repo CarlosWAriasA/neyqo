@@ -85,6 +85,15 @@ Theme preference is persisted in `neyqo.theme` with `light`, `dark`, or `system`
 
 The frontend exposes a web app manifest and registers `public/sw.js` only in production builds. The service worker caches the app shell and static assets, but it must not cache `/api` requests or other authenticated backend traffic.
 
+## SEO
+
+- `https://neyqo.xyz/` is the canonical production origin.
+- The landing page exposes crawlable fallback content, canonical metadata, social cards, and structured data directly in `index.html`.
+- `privacy.html` and `terms.html` are separate Vite HTML entries so direct requests return route-specific metadata before React runs.
+- `public/sitemap.xml` contains only public canonical pages and `public/robots.txt` excludes authentication and private app routes.
+- Azure, Nginx, and Vercel configuration must keep `X-Robots-Tag: noindex` on `/app/*`, authentication callbacks, and password/account entry routes.
+- Update canonical URLs, sitemap entries, and social image URLs together if the production domain changes.
+
 ## Container Deployment
 
 - `Dockerfile` builds the Vite application and serves `dist` through Nginx.

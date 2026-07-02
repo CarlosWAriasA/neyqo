@@ -1,7 +1,7 @@
 {
-  "name": "Neyqo",
+  "name": "Neyqo Finanzas Personales",
   "short_name": "Neyqo",
-  "description": "Administra tus finanzas personales con claridad y confianza.",
+  "description": "Registra gastos e ingresos, organiza tus cuentas y crea presupuestos con Neyqo.",
   "lang": "es",
   "dir": "ltr",
   "start_url": "/",

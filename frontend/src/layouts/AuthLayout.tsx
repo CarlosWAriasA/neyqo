@@ -1,9 +1,15 @@
 import { Link, Outlet } from 'react-router-dom';
 import { BrandMark } from '../components/navigation/BrandMark';
+import { SeoMetadata } from '../components/seo/SeoMetadata';
 
 export function AuthLayout() {
   return (
     <main className="min-h-screen bg-canvas text-text">
+      <SeoMetadata
+        title="Acceso seguro | Neyqo"
+        description="Accede de forma segura a tu cuenta de Neyqo."
+        noIndex
+      />
       <div className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-8 px-4 py-8 lg:grid-cols-[0.9fr_1.1fr]">
         <section className="hidden lg:block">
           <Link to="/" aria-label="Volver a Neyqo">

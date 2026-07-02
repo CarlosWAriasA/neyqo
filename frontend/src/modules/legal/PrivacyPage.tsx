@@ -1,4 +1,5 @@
 import { PageHeader } from '../../components/common/PageHeader';
+import { SeoMetadata } from '../../components/seo/SeoMetadata';
 import { Card } from '../../components/ui/card';
 import { LegalBackLink } from './LegalBackLink';
 
@@ -79,6 +80,11 @@ const sections = [
 export function PrivacyPage() {
   return (
     <div className="mx-auto grid max-w-4xl gap-6 px-4 py-12 md:px-8">
+      <SeoMetadata
+        title="Política de privacidad | Neyqo"
+        description="Conoce cómo Neyqo recopila, usa y protege tus datos personales y financieros."
+        path="/privacy"
+      />
       <PageHeader
         title="Política de privacidad"
         description="Cómo Neyqo Finanzas Personales recopila, usa y protege información de usuarios e integraciones."

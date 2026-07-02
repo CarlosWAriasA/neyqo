@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AuthModal, type AuthModalMode } from '../../components/forms/AuthModal';
+import { SeoMetadata } from '../../components/seo/SeoMetadata';
 import { resolveTheme } from '../../theme/theme';
 import { useTheme } from '../../theme/theme-context';
 import { AutomationSection } from './components/AutomationSection';
@@ -48,6 +49,11 @@ export function LandingPage() {
 
   return (
     <div className="overflow-hidden">
+      <SeoMetadata
+        title="Neyqo | App de finanzas personales"
+        description="Neyqo es una app de finanzas personales para registrar gastos e ingresos, organizar cuentas, crear presupuestos y entender mejor tu dinero."
+        path="/"
+      />
       <LandingHeader
         menuOpen={menuOpen}
         resolvedTheme={resolvedTheme}

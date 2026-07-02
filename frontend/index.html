@@ -9,8 +9,37 @@
     />
     <meta
       name="description"
-      content="Neyqo ayuda a administrar finanzas personales con claridad y confianza."
+      content="Neyqo es una app de finanzas personales para registrar gastos e ingresos, organizar cuentas, crear presupuestos y entender mejor tu dinero."
     />
+    <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" />
+    <meta name="application-name" content="Neyqo" />
+    <meta name="format-detection" content="telephone=no" />
+    <link rel="canonical" href="https://neyqo.xyz/" />
+    <link rel="alternate" hreflang="es" href="https://neyqo.xyz/" />
+    <link rel="alternate" hreflang="x-default" href="https://neyqo.xyz/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_DO" />
+    <meta property="og:site_name" content="Neyqo" />
+    <meta property="og:title" content="Neyqo | App de finanzas personales" />
+    <meta
+      property="og:description"
+      content="Controla gastos, ingresos, cuentas y presupuestos desde una app de finanzas personales clara y sencilla."
+    />
+    <meta property="og:url" content="https://neyqo.xyz/" />
+    <meta property="og:image" content="https://neyqo.xyz/og-image.png" />
+    <meta property="og:image:secure_url" content="https://neyqo.xyz/og-image.png" />
+    <meta property="og:image:type" content="image/png" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Neyqo, finanzas personales simples" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Neyqo | App de finanzas personales" />
+    <meta
+      name="twitter:description"
+      content="Controla gastos, ingresos, cuentas y presupuestos desde una app clara y sencilla."
+    />
+    <meta name="twitter:image" content="https://neyqo.xyz/og-image.png" />
+    <meta name="twitter:image:alt" content="Neyqo, finanzas personales simples" />
     <meta name="theme-color" content="#0F766E" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
@@ -29,10 +58,102 @@
         document.documentElement.style.colorScheme = theme;
       })();
     </script>
-    <title>Neyqo</title>
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@graph": [
+          {
+            "@type": "WebSite",
+            "@id": "https://neyqo.xyz/#website",
+            "url": "https://neyqo.xyz/",
+            "name": "Neyqo",
+            "alternateName": "Neyqo Finanzas Personales",
+            "description": "Aplicación web para organizar las finanzas personales.",
+            "inLanguage": "es"
+          },
+          {
+            "@type": "SoftwareApplication",
+            "@id": "https://neyqo.xyz/#app",
+            "name": "Neyqo",
+            "alternateName": "Neyqo Finanzas Personales",
+            "url": "https://neyqo.xyz/",
+            "applicationCategory": "FinanceApplication",
+            "applicationSubCategory": "Personal finance",
+            "operatingSystem": "Web",
+            "inLanguage": "es",
+            "description": "App de finanzas personales para registrar gastos e ingresos, organizar cuentas, crear presupuestos y analizar hábitos financieros.",
+            "offers": {
+              "@type": "Offer",
+              "price": "0",
+              "priceCurrency": "USD"
+            },
+            "featureList": [
+              "Registro de gastos e ingresos",
+              "Organización de cuentas",
+              "Presupuestos mensuales",
+              "Movimientos programados",
+              "Reportes financieros"
+            ]
+          }
+        ]
+      }
+    </script>
+    <style>
+      .seo-fallback { box-sizing: border-box; max-width: 72rem; margin: 0 auto; padding: 2rem 1.25rem; font-family: Inter, ui-sans-serif, system-ui, sans-serif; color: #0f172a; }
+      .seo-fallback a { color: #0f766e; }
+      .seo-fallback h1 { max-width: 48rem; margin: 4rem 0 1rem; font-size: clamp(2.25rem, 6vw, 4rem); line-height: 1.08; }
+      .seo-fallback h2 { margin-top: 3rem; font-size: 1.5rem; }
+      .seo-fallback p, .seo-fallback li { max-width: 48rem; line-height: 1.75; }
+      .seo-fallback nav, .seo-fallback ul { display: flex; flex-wrap: wrap; gap: 1rem; }
+      .seo-fallback ul { padding: 0; list-style: none; }
+    </style>
+    <title>Neyqo | App de finanzas personales</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <div class="seo-fallback">
+        <header>
+          <strong>Neyqo</strong>
+          <nav aria-label="Navegación principal">
+            <a href="#beneficios">Beneficios</a>
+            <a href="#funcionalidades">Funcionalidades</a>
+            <a href="/?auth=login">Iniciar sesión</a>
+          </nav>
+        </header>
+        <main>
+          <section>
+            <p>Finanzas personales simples</p>
+            <h1>Neyqo: toma el control de tus finanzas personales</h1>
+            <p>
+              Registra tus ingresos y gastos, organiza tus cuentas, crea presupuestos y entiende
+              mejor en qué estás utilizando tu dinero desde un solo lugar.
+            </p>
+            <a href="/?auth=register">Crear cuenta gratis</a>
+          </section>
+          <section id="beneficios">
+            <h2>Organiza tu dinero con claridad</h2>
+            <p>
+              Mantén separadas tus cuentas bancarias, tarjetas, efectivo y billeteras digitales.
+              Revisa tus movimientos y conoce cuánto puedes gastar antes de exceder tu presupuesto.
+            </p>
+          </section>
+          <section id="funcionalidades">
+            <h2>Todo lo necesario para gestionar tus finanzas</h2>
+            <ul>
+              <li>Registro de gastos e ingresos</li>
+              <li>Control de cuentas y categorías</li>
+              <li>Presupuestos mensuales</li>
+              <li>Movimientos programados</li>
+              <li>Reportes de hábitos financieros</li>
+            </ul>
+          </section>
+        </main>
+        <footer>
+          <a href="/privacy">Política de privacidad</a>
+          <a href="/terms">Términos y condiciones</a>
+        </footer>
+      </div>
+    </div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>

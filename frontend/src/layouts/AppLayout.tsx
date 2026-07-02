@@ -1,10 +1,16 @@
 import { Outlet } from 'react-router-dom';
 import { MobileNavigation } from '../components/navigation/MobileNavigation';
 import { Sidebar } from '../components/navigation/Sidebar';
+import { SeoMetadata } from '../components/seo/SeoMetadata';
 
 export function AppLayout() {
   return (
     <div className="min-h-screen bg-canvas text-text lg:h-screen lg:overflow-hidden">
+      <SeoMetadata
+        title="Mi espacio financiero | Neyqo"
+        description="Área privada de Neyqo."
+        noIndex
+      />
       <MobileNavigation />
       <div className="lg:flex lg:h-full lg:min-h-0">
         <Sidebar />

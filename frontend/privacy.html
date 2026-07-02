@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Conoce cómo Neyqo recopila, usa y protege tus datos personales y financieros." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://neyqo.xyz/privacy" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_DO" />
+    <meta property="og:site_name" content="Neyqo" />
+    <meta property="og:title" content="Política de privacidad | Neyqo" />
+    <meta property="og:description" content="Cómo Neyqo recopila, usa y protege tus datos personales y financieros." />
+    <meta property="og:url" content="https://neyqo.xyz/privacy" />
+    <meta property="og:image" content="https://neyqo.xyz/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://neyqo.xyz/og-image.png" />
+    <meta name="theme-color" content="#0F766E" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (() => {
+        const preference = localStorage.getItem('neyqo.theme') || 'system';
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <title>Política de privacidad | Neyqo</title>
+  </head>
+  <body>
+    <div id="root">
+      <main>
+        <h1>Política de privacidad de Neyqo</h1>
+        <p>
+          Esta política explica cómo Neyqo Finanzas Personales recopila, usa y protege la
+          información de sus usuarios y de las integraciones que deciden conectar.
+        </p>
+        <h2>Información y controles del usuario</h2>
+        <p>
+          Neyqo utiliza los datos necesarios para operar la aplicación, proteger las cuentas y
+          mostrar la información financiera que cada usuario registra o confirma.
+        </p>
+        <a href="/">Volver a Neyqo</a>
+      </main>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

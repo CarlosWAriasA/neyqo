@@ -1,0 +1,49 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="description" content="Consulta las condiciones de uso de Neyqo, la app de finanzas personales." />
+    <meta name="robots" content="index, follow" />
+    <link rel="canonical" href="https://neyqo.xyz/terms" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="es_DO" />
+    <meta property="og:site_name" content="Neyqo" />
+    <meta property="og:title" content="Términos y condiciones | Neyqo" />
+    <meta property="og:description" content="Condiciones de uso de Neyqo Finanzas Personales." />
+    <meta property="og:url" content="https://neyqo.xyz/terms" />
+    <meta property="og:image" content="https://neyqo.xyz/og-image.png" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:image" content="https://neyqo.xyz/og-image.png" />
+    <meta name="theme-color" content="#0F766E" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <script>
+      (() => {
+        const preference = localStorage.getItem('neyqo.theme') || 'system';
+        const systemDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        const theme = preference === 'system' ? (systemDark ? 'dark' : 'light') : preference;
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      })();
+    </script>
+    <title>Términos y condiciones | Neyqo</title>
+  </head>
+  <body>
+    <div id="root">
+      <main>
+        <h1>Términos y condiciones de Neyqo</h1>
+        <p>
+          Estas condiciones explican las reglas para usar Neyqo, una herramienta diseñada para
+          organizar cuentas, presupuestos, movimientos y transacciones personales.
+        </p>
+        <h2>Uso de la aplicación</h2>
+        <p>
+          Neyqo es una herramienta organizativa de finanzas personales y no sustituye asesoría
+          financiera, fiscal o legal profesional.
+        </p>
+        <a href="/">Volver a Neyqo</a>
+      </main>
+    </div>
+    <script type="module" src="/src/main.tsx"></script>
+  </body>
+</html>

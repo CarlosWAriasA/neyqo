@@ -1,0 +1,68 @@
+{
+  "routes": [
+    {
+      "route": "/privacy",
+      "rewrite": "/privacy.html"
+    },
+    {
+      "route": "/terms",
+      "rewrite": "/terms.html"
+    },
+    {
+      "route": "/app",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/app/*",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/auth/*",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/login",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/register",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/forgot-password",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    },
+    {
+      "route": "/reset-password",
+      "headers": {
+        "X-Robots-Tag": "noindex, nofollow, noarchive"
+      }
+    }
+  ],
+  "navigationFallback": {
+    "rewrite": "/index.html",
+    "exclude": [
+      "/assets/*",
+      "/*.css",
+      "/*.js",
+      "/*.json",
+      "/*.png",
+      "/*.svg",
+      "/*.txt",
+      "/*.xml",
+      "/*.webmanifest"
+    ]
+  }
+}

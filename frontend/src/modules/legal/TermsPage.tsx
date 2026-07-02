@@ -1,4 +1,5 @@
 import { PageHeader } from '../../components/common/PageHeader';
+import { SeoMetadata } from '../../components/seo/SeoMetadata';
 import { Card } from '../../components/ui/card';
 import { LegalBackLink } from './LegalBackLink';
 
@@ -66,6 +67,11 @@ const sections = [
 export function TermsPage() {
   return (
     <div className="mx-auto grid max-w-4xl gap-6 px-4 py-12 md:px-8">
+      <SeoMetadata
+        title="Términos y condiciones | Neyqo"
+        description="Consulta las condiciones de uso de Neyqo, la app de finanzas personales."
+        path="/terms"
+      />
       <PageHeader
         title="Términos y condiciones"
         description="Condiciones de uso de Neyqo Finanzas Personales para usuarios de la aplicación web."

@@ -22,7 +22,7 @@ export function HeroSection({ onAuthOpen }: HeroSectionProps) {
       >
         <Badge tone="transfer">Finanzas personales simples</Badge>
         <h1 className="mt-6 text-4xl font-semibold leading-tight text-text md:text-6xl">
-          Toma el control de tu dinero sin complicarte.
+          Neyqo: toma el control de tus finanzas personales.
         </h1>
         <p className="mt-5 max-w-2xl text-lg leading-8 text-subtle">
           Registra tus ingresos y gastos, organiza tus cuentas y entiende mejor en qué estás
